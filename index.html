@@ -26,6 +26,9 @@
   .listen-btn:hover{ background:#F3F4F6; color:#0D9488; }
   .lift-btn:hover{ transform:translateY(-1px); filter:brightness(0.95); box-shadow:0 8px 18px rgba(0,0,0,0.12); }
   .hover-lift{ transition:transform .18s ease, box-shadow .18s ease; } .hover-lift:hover{ transform:translateY(-1px); box-shadow:0 8px 22px rgba(0,0,0,0.06); }
+  .card-exit{ transition:opacity .25s ease, transform .25s ease; }
+  .card-exit.removing{ opacity:0; transform:translateY(-8px); pointer-events:none; }
+  .chat-anim{ transition:height .35s ease-in-out, box-shadow .35s ease-in-out, border-radius .35s ease-in-out; overflow:hidden; }
   .card{ background:#fff; border:1px solid var(--line); border-radius:16px; }
   .row:hover{ background:var(--soft); }
   .fade{ animation:f .25s ease-out; } @keyframes f{ from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:none;} }
@@ -215,10 +218,10 @@ function CallDetail({ c, expanded, onToggleExpand }){
   function jumpBottom(){ const el=boxRef.current; if(el) el.scrollTop=el.scrollHeight; setHasNew(false); setAtBottom(true); }
 
   const h = expanded ? 'calc(100vh - 150px)' : 600;
-  if(!c) return <div className="card flex items-center justify-center sub text-sm" style={{height:h}}>Select a call to listen in.</div>;
+  if(!c) return <div className="card chat-anim flex items-center justify-center sub text-sm" style={{height:h}}>Select a call to listen in.</div>;
   const st = STATUS[c.status];
   return (
-    <div className="card flex flex-col" style={{height:h}}>
+    <div className="card chat-anim flex flex-col" style={{height:h, ...(expanded?{boxShadow:'0 18px 45px rgba(0,0,0,0.12)',borderRadius:24,position:'relative',zIndex:20}:{})}}>
       <div className="px-4 py-3 border-b line flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold truncate">{c.name||'Identifying caller…'}</div>
@@ -260,22 +263,24 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
   const [expand,setExpand] = useState(false);
   const [editing,setEditing] = useState(false);
   const [reason,setReason] = useState(c.proposed?c.proposed.reason:'');
+  const [removing,setRemoving] = useState(false);
+  function act(fn){ setRemoving(true); setTimeout(fn, 240); }   // animate out, then commit
   if(c.status==='emergency'){
     return (
-      <div className="card hover-lift p-4 mb-3 fade" style={{borderColor:'#fca5a5'}}>
+      <div className={`card hover-lift card-exit p-4 mb-3 fade ${removing?'removing':''}`} style={{borderColor:'#fca5a5'}}>
         <div className="text-sm font-semibold flex items-center gap-2" style={{color:'#b91c1c'}}><EmergencyBadgeIcon/> Emergency — {c.name}</div>
         {c.mrn && <div className="text-[11px] sub">MRN {c.mrn}</div>}
         <div className="text-xs sub mt-1">{c.symptoms}</div>
         <div className="text-xs mt-1" style={{color:'#b91c1c'}}>999 advised · no booking · duty team alerted.</div>
         <div className="flex gap-2 mt-3">
           <button onClick={()=>onOpen(c.id)} className="listen-btn text-sm px-3 py-1.5 rounded-lg border line">Listen in</button>
-          <button onClick={()=>onAck(c)} className="ack-btn text-white text-sm px-3 py-1.5 rounded-lg flex-1" style={{background:'#dc2626'}}>Acknowledge</button>
+          <button onClick={()=>act(()=>onAck(c))} className="ack-btn text-white text-sm px-3 py-1.5 rounded-lg flex-1" style={{background:'#dc2626'}}>Acknowledge</button>
         </div>
       </div>
     );
   }
   return (
-    <div className="card hover-lift p-4 mb-3 fade" style={{borderColor:'#fcd34d'}}>
+    <div className={`card hover-lift card-exit p-4 mb-3 fade ${removing?'removing':''}`} style={{borderColor:'#fcd34d'}}>
       <button onClick={()=>onOpen(c.id)} className="text-left w-full">
         <div className="text-sm font-semibold">Proposed: Book {c.proposed.urgency==='Routine'?'routine':c.proposed.urgency.toLowerCase()} GP slot</div>
         <div className="text-xs sub mt-0.5">{c.name}{c.mrn?` · MRN ${c.mrn}`:''}</div>
@@ -293,9 +298,9 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
         </div>
       )}
       <div className="flex gap-2 mt-3">
-        <button onClick={()=>onApprove(c, editing?reason:null)} className="approve-btn accent text-white text-sm py-2 rounded-lg flex-1">Approve</button>
+        <button onClick={()=>act(()=>onApprove(c, editing?reason:null))} className="approve-btn accent text-white text-sm py-2 rounded-lg flex-1">Approve</button>
         <button onClick={()=>{ if(editing){onEdit(c,reason);setEditing(false);} else setEditing(true); }} className="edit-btn border line text-sm px-3 py-2 rounded-lg">{editing?'Save':'Edit'}</button>
-        <button onClick={()=>onReject(c)} className="reject-btn border line text-sm px-3 py-2 rounded-lg">Reject</button>
+        <button onClick={()=>act(()=>onReject(c))} className="reject-btn border line text-sm px-3 py-2 rounded-lg">Reject</button>
       </div>
     </div>
   );
@@ -304,13 +309,13 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
 function ApprovalsPanel({ calls, onApprove, onReject, onEdit, onAck, onOpen, expanded }){
   const queue = calls.filter(c=> c.status==='await-approval' || (c.status==='emergency' && !c.ack));
   return (
-    <div className="flex flex-col" style={{height: expanded?'calc(100vh - 150px)':600}}>
+    <div className="flex flex-col chat-anim" style={{height: expanded?'calc(100vh - 150px)':600}}>
       <div className="flex items-center gap-2 mb-3 shrink-0">
         <span className="text-xs font-semibold sub uppercase tracking-wide">Needs staff action</span>
-        {queue.length>0 && <span className="text-[10px] text-white px-1.5 rounded-full" style={{background:'#f59e0b'}}>{queue.length}</span>}
+        {queue.length>0 && <span className="inline-flex items-center justify-center text-white font-bold" style={{minWidth:20,height:20,borderRadius:'50%',fontSize:11,background:'#f59e0b'}}>{queue.length}</span>}
       </div>
       <div className="nice-scroll flex-1 overflow-y-auto pr-1.5 pb-2" style={{minHeight:0}}>
-        {queue.length===0 && <div className="card p-6 text-center text-sm sub">Nothing waiting. Booking proposals and emergencies appear here for you to approve.</div>}
+        {queue.length===0 && <div className="text-center text-sm" style={{color:'#6B7280',background:'#F9FAFB',border:'1px solid #E5E7EB',borderRadius:16,padding:24}}>No staff actions needed right now.</div>}
         {queue.map(c=><ApprovalCard key={c.id} c={c} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={onOpen}/>)}
       </div>
     </div>
@@ -326,16 +331,14 @@ function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onC
       {/* Header. Note: the descriptive helper text was intentionally removed from the UI per design. */}
       <div className="flex items-center gap-3 mb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Live calls</h1>
-        <span className="text-xs font-medium px-2 py-1 rounded-full" style={{background:'var(--accent-soft)',color:'#0f766e'}}>{active.length} on the line</span>
+        {active.length>0 && <span className="text-xs font-medium px-2 py-1 rounded-full" style={{background:'var(--accent-soft)',color:'#0f766e'}}>{active.length} on the line</span>}
       </div>
       <div className="grid grid-cols-12 gap-5">
-        {!expanded && (
-          <div className="col-span-3">
-            <div className="text-xs font-semibold sub uppercase tracking-wide mb-3">On the line</div>
-            {calls.map(c=><CallCard key={c.id} c={c} active={sel===c.id} onClick={()=>setSel(c.id)} onCallback={onCallback}/>)}
-          </div>
-        )}
-        <div className={expanded?'col-span-9':'col-span-6'}><CallDetail c={selCall} expanded={expanded} onToggleExpand={()=>setExpanded(e=>!e)}/></div>
+        <div className="col-span-3">
+          <div className="text-xs font-semibold sub uppercase tracking-wide mb-3">On the line</div>
+          {calls.map(c=><CallCard key={c.id} c={c} active={sel===c.id} onClick={()=>setSel(c.id)} onCallback={onCallback}/>)}
+        </div>
+        <div className="col-span-6"><CallDetail c={selCall} expanded={expanded} onToggleExpand={()=>setExpanded(e=>!e)}/></div>
         <div className="col-span-3"><ApprovalsPanel calls={calls} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={setSel} expanded={expanded}/></div>
       </div>
     </div>
