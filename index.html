@@ -27,7 +27,11 @@
   .call-icon-wrapper::before{ content:''; position:absolute; inset:0; border-radius:50%; border:1px solid rgba(13,148,136,0.35); animation:callPulse 1.4s ease-out infinite; }
   @keyframes phoneRing{ 0%{transform:rotate(0) scale(1);} 20%{transform:rotate(-12deg) scale(1.05);} 40%{transform:rotate(12deg) scale(1.08);} 60%{transform:rotate(-8deg) scale(1.04);} 80%{transform:rotate(8deg) scale(1.02);} 100%{transform:rotate(0) scale(1);} }
   @keyframes callPulse{ 0%{transform:scale(1); opacity:.5;} 100%{transform:scale(1.6); opacity:0;} }
-  @media (prefers-reduced-motion: reduce){ .call-icon,.call-icon-wrapper::before{ animation:none; } }
+  .emergency-dot{ width:10px; height:10px; border-radius:50%; background:#EF4444; box-shadow:0 0 10px rgba(239,68,68,0.8); animation:emergencyDotPulse 1.3s ease-in-out infinite; display:inline-block; flex:none; }
+  @keyframes emergencyDotPulse{ 0%{transform:scale(1); box-shadow:0 0 6px rgba(239,68,68,0.5);} 50%{transform:scale(1.25); box-shadow:0 0 18px rgba(239,68,68,1);} 100%{transform:scale(1); box-shadow:0 0 6px rgba(239,68,68,0.5);} }
+  .emergency-icon{ color:#EF4444; animation:emergencyGlow 1.4s ease-in-out infinite; }
+  @keyframes emergencyGlow{ 0%{filter:drop-shadow(0 0 2px rgba(239,68,68,0.4));} 50%{filter:drop-shadow(0 0 10px rgba(239,68,68,0.9));} 100%{filter:drop-shadow(0 0 2px rgba(239,68,68,0.4));} }
+  @media (prefers-reduced-motion: reduce){ .call-icon,.call-icon-wrapper::before,.emergency-dot,.emergency-icon{ animation:none; } }
   ::-webkit-scrollbar{ width:8px; } ::-webkit-scrollbar-thumb{ background:#e4e4e7; border-radius:4px; }
 </style>
 </head>
@@ -118,6 +122,16 @@ function PhoneIcon({ size=18, cls='' }){
   );
 }
 function PhoneRing(){ return <span className="call-icon-wrapper"><PhoneIcon size={15} cls="call-icon"/></span>; }
+function AlertIcon({ size=18, cls='' }){
+  return (
+    <svg className={cls} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  );
+}
+function EmergencyBadgeIcon({ size=16 }){
+  return <span className="inline-flex items-center justify-center" style={{background:'rgba(239,68,68,0.12)',borderRadius:999,padding:6}}><AlertIcon size={size} cls="emergency-icon"/></span>;
+}
 
 /* ---------- Live Calls board ---------- */
 function CallCard({ c, active, onClick, onCallback }){
@@ -128,7 +142,7 @@ function CallCard({ c, active, onClick, onCallback }){
   return (
     <div onClick={onClick} className={`card p-3 mb-2 fade cursor-pointer ${active?'ring-2':''}`} style={active?{boxShadow:'0 0 0 2px var(--accent)'}:c.status==='emergency'?{borderColor:'#fca5a5'}:{}}>
       <div className="flex items-center gap-2">
-        {c.status==='ringing' ? <PhoneRing/> : <span className={liveDot?'live':''} style={{color:st.c}}>●</span>}
+        {c.status==='ringing' ? <PhoneRing/> : c.status==='emergency' ? <span className="emergency-dot"></span> : <span className={liveDot?'live':''} style={{color:st.c}}>●</span>}
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium truncate">{ident}</div>
           <div className="text-xs sub truncate">{c.mrn?`MRN ${c.mrn}`:c.phone}</div>
@@ -191,7 +205,7 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
   if(c.status==='emergency'){
     return (
       <div className="card p-4 mb-3 fade" style={{borderColor:'#fca5a5'}}>
-        <div className="text-sm font-semibold" style={{color:'#b91c1c'}}>🚨 Emergency — {c.name}</div>
+        <div className="text-sm font-semibold flex items-center gap-2" style={{color:'#b91c1c'}}><EmergencyBadgeIcon/> Emergency — {c.name}</div>
         {c.mrn && <div className="text-[11px] sub">MRN {c.mrn}</div>}
         <div className="text-xs sub mt-1">{c.symptoms}</div>
         <div className="text-xs mt-1" style={{color:'#b91c1c'}}>999 advised · no booking · duty team alerted.</div>
@@ -248,11 +262,11 @@ function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onC
   const selCall = calls.find(c=>c.id===sel) || null;
   return (
     <div className="max-w-7xl mx-auto fade">
-      <div className="flex items-center gap-3 mb-1">
+      {/* Header. Note: the descriptive helper text was intentionally removed from the UI per design. */}
+      <div className="flex items-center gap-3 mb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Live calls</h1>
         <span className="text-xs font-medium px-2 py-1 rounded-full" style={{background:'var(--accent-soft)',color:'#0f766e'}}>{active.length} on the line</span>
       </div>
-      <p className="sub text-sm mb-5">The AI agent is handling every call at once. Listen in on the left; approve or reject the bookings it proposes on the right.</p>
       <div className="grid grid-cols-12 gap-5">
         <div className="col-span-3">
           <div className="text-xs font-semibold sub uppercase tracking-wide mb-3">On the line</div>
@@ -326,7 +340,7 @@ function Bell({ notes, onOpen, open, onPick }){
           {notes.length===0 && <div className="text-sm sub text-center py-6">Nothing yet.</div>}
           {notes.map(n=>(
             <button key={n.id} onClick={()=>onPick(n)} className="row w-full text-left px-2 py-2 rounded-lg flex gap-2 items-start">
-              <span style={{color:n.type==='emergency'?'#ef4444':'#0d9488'}}>{n.type==='emergency'?'🚨':'📅'}</span>
+              <span className="mt-0.5" style={{color:n.type==='emergency'?'#ef4444':'#0d9488'}}>{n.type==='emergency'? <AlertIcon size={15} cls="emergency-icon"/> : '📅'}</span>
               <div className="flex-1"><div className="text-sm">{n.text}</div><div className="text-[11px] sub">{n.time}</div></div>
               {!n.read && <span className="w-2 h-2 rounded-full accent mt-1"></span>}
             </button>
@@ -375,7 +389,7 @@ function App(){
       if((c.status==='await-approval'||c.status==='emergency') && !notified.current.has(key)){
         notified.current.add(key);
         setNotes(n=>[{ id:key, type:c.status==='emergency'?'emergency':'booking', callId:c.id, read:false,
-          text: c.status==='emergency' ? `🚨 Emergency on call from ${c.name} — 999 advised` : `${c.name} — booking awaiting your approval`,
+          text: c.status==='emergency' ? `Emergency on call from ${c.name} — 999 advised` : `${c.name} — booking awaiting your approval`,
           time: new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) }, ...n]);
       }
     });
