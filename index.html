@@ -577,10 +577,6 @@ function OvernightCard({ o, onConfirm, onEdit, onReject }){
   );
 }
 
-function MorningStat({ value, label, color }){
-  return <div className="card p-3"><div className="text-xl font-bold" style={{color:color||'var(--ink)'}}>{value}</div><div className="text-[11px] sub mt-0.5 leading-tight">{label}</div></div>;
-}
-
 function MorningReview({ overnight, onConfirm, onEdit, onReject, onAck, onCallback }){
   const emergencies = overnight.filter(o=>o.urgency==='Emergency' && o.status==='pending');
   const bookings = overnight.filter(o=>o.urgency!=='Emergency' && o.status==='pending')
@@ -597,12 +593,22 @@ function MorningReview({ overnight, onConfirm, onEdit, onReject, onAck, onCallba
         <span className="text-xs sub">overnight · handled by AI while closed</span>
       </div>
 
-      {/* stat chips */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
-        <MorningStat value={totalHandled} label="overnight calls"/>
-        <MorningStat value={urgentCount} label="urgent — same-day slot" color="#c2410c"/>
-        <MorningStat value={OVERNIGHT_SEED.filter(o=>o.urgency==='Emergency').length} label="emergency → 999" color="#b91c1c"/>
-        <MorningStat value={left} label="left to clear" color="#0D9488"/>
+      {/* summary bar */}
+      <div className="card flex items-stretch py-3 px-2 mb-6">
+        {[[totalHandled,'overnight calls',null,null],
+          [urgentCount,'urgent · same-day','#c2410c','#f97316'],
+          [OVERNIGHT_SEED.filter(o=>o.urgency==='Emergency').length,'emergency → 999','#b91c1c','#ef4444'],
+          [left,'left to clear','#0D9488','#0D9488']
+        ].map((s,i)=>(
+          <React.Fragment key={i}>
+            {i>0 && <div style={{width:1,background:'var(--line)',margin:'2px 0'}}></div>}
+            <div className="flex items-center gap-2.5 px-5">
+              {s[3] && <span className="w-2 h-2 rounded-full" style={{background:s[3]}}></span>}
+              <span className="text-lg font-bold tabular-nums" style={{color:s[2]||'var(--ink)'}}>{s[0]}</span>
+              <span className="text-xs sub">{s[1]}</span>
+            </div>
+          </React.Fragment>
+        ))}
       </div>
 
       {allClear && (
