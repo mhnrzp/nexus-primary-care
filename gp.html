@@ -686,7 +686,7 @@ function App(){
   return (
     <div className="flex">
       <Sidebar nav={nav==='record'?'patients':nav} go={go}/>
-      <main className="flex-1 min-w-0 px-8 py-7 min-h-screen">
+      <main className="flex-1 min-w-0 px-8 py-7 main-dots min-h-screen">
         {nav==='dashboard' && <Dashboard open={open}/>}
         {nav==='record' && <PatientRecord id={patient} back={()=>go('patients')}/>}
         {nav==='patients' && <PatientsList open={open}/>}
