@@ -29,11 +29,14 @@
   .hoverable{ transition:background .12s,border-color .12s; }
   .hoverable:hover{ background:var(--hover); }
   .nhs{ background:var(--nhs); } .nhs-t{ color:var(--nhs); }
-  .navitem{ color:var(--sub); transition:all .12s; }
-  .navitem:hover{ background:var(--hover); color:var(--text); }
+  .navitem{ color:var(--sub); transition:all .15s; }
+  .navitem:hover{ background:rgba(0,94,182,.10); color:var(--nhs); }
   .navitem.active{ background:rgba(0,94,182,.12); color:var(--nhs); font-weight:600; }
-  button{ font-family:inherit; cursor:pointer; }
+  button{ font-family:inherit; cursor:pointer; transition:background .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .12s ease; }
   button:focus-visible,a:focus-visible{ outline:2px solid var(--nhs); outline-offset:2px; }
+  button:active{ transform:scale(0.98); }
+  button.nhs:hover{ background:#004a99; box-shadow:0 8px 18px rgba(0,94,182,0.28); transform:translateY(-1px); }
+  .hover-lift{ transition:transform .18s ease, box-shadow .18s ease; } .hover-lift:hover{ transform:translateY(-1px); box-shadow:0 8px 22px rgba(0,0,0,0.06); }
   ::-webkit-scrollbar{ width:9px; height:9px; }
   ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:5px; }
   .fade{ animation:fade .3s ease-out; }
