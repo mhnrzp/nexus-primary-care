@@ -167,12 +167,9 @@ const NAV = [
 function Sidebar({ nav, setNav, approvalsCount }){
   return (
     <aside className="w-60 shrink-0 bdr bd h-screen sticky top-0 flex flex-col" style={{background:'var(--sidebar)',borderRight:'1px solid var(--border)',borderTop:'none',borderBottom:'none',borderLeft:'none'}}>
-      <div className="px-4 py-4 bdb flex items-center gap-2">
-        <div className="nhs text-white font-extrabold rounded-lg w-9 h-9 flex items-center justify-center">N</div>
-        <div>
-          <div className="font-bold leading-tight">NEXUS</div>
-          <div className="text-[10px] text-sub">Unified Healthcare Platform</div>
-        </div>
+      <div className="px-4 py-4 bdb flex flex-col gap-1">
+        <img src="logo.svg" alt="NEXUS" style={{height:24,alignSelf:'flex-start'}}/>
+        <div className="text-[10px] text-sub">Unified Healthcare Platform</div>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3">
