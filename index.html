@@ -376,15 +376,19 @@ function Calendar({ bookings }){
 }
 
 /* ---------- Sidebar + topbar ---------- */
-const NAV = [['calls','Live Calls', <path d="M5 4h4l2 5-2 1a11 11 0 005 5l1-2 5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/>],['calendar','Calendar', <path d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4"/>]];
-function Sidebar({ nav, go }){
+const NAV = [
+  ['calls','Live Calls', <path d="M5 4h4l2 5-2 1a11 11 0 005 5l1-2 5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/>],
+  ['morning','Morning Review', <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>],
+  ['calendar','Calendar', <path d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4"/>],
+];
+function Sidebar({ nav, go, morningCount }){
   return (
     <aside className="w-56 shrink-0 h-screen sticky top-0 px-3 pt-7 pb-5 border-r line bg-white flex flex-col">
       <div className="px-3 mb-[18px]">
         <img src="logo.svg" alt="NEXUS" style={{height:30}}/>
         <div className="text-[11px] font-medium sub tracking-widest mt-3">FRONT DESK</div>
       </div>
-      <nav className="space-y-1">{NAV.map(([k,label,d])=><button key={k} onClick={()=>go(k)} className={`nav w-full flex items-center gap-3 px-3 py-2.5 text-sm ${nav===k?'on':''}`}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{d}</svg><span>{label}</span></button>)}</nav>
+      <nav className="space-y-1">{NAV.map(([k,label,d])=><button key={k} onClick={()=>go(k)} className={`nav w-full flex items-center gap-3 px-3 py-2.5 text-sm ${nav===k?'on':''}`}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{d}</svg><span className="flex-1 text-left">{label}</span>{k==='morning'&&morningCount>0&&<span className="text-[10px] text-white px-1.5 rounded-full" style={{background:'#f59e0b'}}>{morningCount}</span>}</button>)}</nav>
       <div className="mt-auto px-3 flex items-center gap-2"><div className="w-8 h-8 rounded-full accent text-white flex items-center justify-center text-xs font-semibold">RC</div><div className="text-xs"><div className="font-medium">Reception</div><div className="sub">Oakfield Surgery</div></div></div>
     </aside>
   );
@@ -414,6 +418,111 @@ function Bell({ notes, onOpen, open, onPick }){
   );
 }
 
+/* ---------- Overnight (out-of-hours AI) captures ---------- */
+const OVERNIGHT_SEED = [
+  { id:'o1', name:'Tom Bennett',    mrn:'OAK-07734', dob:'30 Jun 1968', reason:'Chest pain + breathlessness', urgency:'Emergency', time:'01:12', status:'pending', advice:'999 advised · no booking', transcript:[['ai','Oakfield Surgery — we\'re closed, but I can help. Your name?'],['pt','Tom Bennett, I\'ve got chest pain and I feel breathless.'],['ai','This needs emergency help now — please call 999. I\'m logging this for the team.']] },
+  { id:'o2', name:'Priya Sharma',   mrn:'OAK-09112', dob:'09 May 1990', reason:'UTI symptoms, worsening, some back pain', urgency:'Urgent', time:'02:40', status:'pending', transcript:[['ai','Oakfield Surgery, the practice is closed but I can take details. What\'s wrong?'],['pt','Burning when I pass urine for 2 days, now there\'s back pain.'],['ai','Thanks Priya — no fever or vomiting? Good. I\'ll get you a same-day call in the morning and flag it as a priority.']] },
+  { id:'o3', name:'Leah Brooks',    mrn:'OAK-05540', dob:'17 Feb 2016', reason:'Child — worsening cough + wheeze', urgency:'Urgent', time:'03:05', status:'pending', transcript:[['ai','Oakfield Surgery. What\'s happening?'],['pt','My daughter has a bad cough and she\'s wheezing a bit.'],['ai','Is she breathing okay between coughs, no blue lips? Okay. I\'ll prioritise a same-day appointment and the team will call first thing.']] },
+  { id:'o4', name:'Margaret Hughes',mrn:'OAK-04821', dob:'14 Mar 1957', reason:'Sore throat + fever, 3 days', urgency:'Soon', time:'23:14', status:'pending', transcript:[['ai','Oakfield Surgery, closed but I can help.'],['pt','Sore throat and fever for three days.'],['ai','No trouble breathing or swallowing — good. I\'ll book you a GP call within 48 hours.']] },
+  { id:'o5', name:'George Hill',    mrn:'OAK-03301', dob:'21 Aug 1949', reason:'Repeat prescription — ran out of inhaler', urgency:'Routine', time:'21:50', status:'pending', transcript:[['ai','How can I help this evening?'],['pt','I\'ve run out of my blue inhaler.'],['ai','I\'ll flag a repeat for the prescriptions team in the morning.']] },
+  { id:'o6', name:'Aisha Khan',     mrn:'OAK-05190', dob:'22 Nov 1995', reason:'Hay fever advice', urgency:'Routine', time:'22:30', status:'pending', transcript:[['ai','What do you need?'],['pt','Itchy eyes, hay fever.'],['ai','A pharmacist can help with that — I\'ll note a routine review option too.']] },
+  { id:'o7', name:'Derek Coombs',   mrn:'OAK-06077', dob:'03 Dec 1981', reason:'Fit note query', urgency:'Routine', time:'00:20', status:'pending', transcript:[['ai','How can I help?'],['pt','I need a fit note extended.'],['ai','I\'ll pass this to the admin team to action in the morning.']] },
+];
+
+function OvernightCard({ o, onConfirm, onEdit, onReject }){
+  const [open,setOpen] = useState(false);
+  const [editing,setEditing] = useState(false);
+  const [reason,setReason] = useState(o.reason);
+  const u = TIER[o.urgency];
+  const slot = o.urgency==='Urgent'?'Same-day slot today':o.urgency==='Soon'?'Within 48 hours':'Routine slot';
+  return (
+    <div className="card hover-lift p-4 mb-3 fade" style={{borderLeft:'3px solid '+u.dot}}>
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold">{o.name}</span>
+            <Tier t={o.urgency}/>
+            {o.urgency==='Urgent' && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{background:'rgba(249,115,22,0.12)',color:'#c2410c'}}>📞 Call back at open</span>}
+          </div>
+          <div className="text-xs sub mt-0.5">MRN {o.mrn} · DOB {o.dob} · called {o.time}</div>
+          {editing
+            ? <input value={reason} onChange={e=>setReason(e.target.value)} className="w-full mt-2 px-3 py-2 rounded-lg soft border line text-sm" style={{background:'var(--soft)'}}/>
+            : <div className="text-sm mt-1.5">{o.reason}</div>}
+          <div className="soft rounded-lg px-3 py-2 text-xs mt-2" style={{background:'var(--soft)'}}>Proposed: <b>{slot}</b> · patient not yet notified</div>
+          <button onClick={()=>setOpen(v=>!v)} className="text-[11px] accent-t mt-2">{open?'▴ Hide transcript':'▾ View transcript'}</button>
+          {open && <div className="mt-2 border-t line pt-2 space-y-1.5">{o.transcript.map((m,i)=>(<div key={i} className={`text-xs ${m[0]==='ai'?'accent-t':''}`}><b>{m[0]==='ai'?'AI':o.name.split(' ')[0]}:</b> {m[1]}</div>))}</div>}
+        </div>
+      </div>
+      <div className="flex gap-2 mt-3">
+        <button onClick={()=>onConfirm(o, editing?reason:null)} className="approve-btn accent text-white text-sm py-2 rounded-lg flex-1">Confirm &amp; book</button>
+        <button onClick={()=>{ if(editing){onEdit(o,reason);setEditing(false);} else setEditing(true); }} className="edit-btn border line text-sm px-3 py-2 rounded-lg">{editing?'Save':'Edit'}</button>
+        <button onClick={()=>onReject(o)} className="reject-btn border line text-sm px-3 py-2 rounded-lg">Reject</button>
+      </div>
+    </div>
+  );
+}
+
+function MorningReview({ overnight, onConfirm, onEdit, onReject, onAck, onCallback }){
+  const emergencies = overnight.filter(o=>o.urgency==='Emergency' && o.status==='pending');
+  const bookings = overnight.filter(o=>o.urgency!=='Emergency' && o.status==='pending')
+    .sort((a,b)=> ({Urgent:0,Soon:1,Routine:2}[a.urgency]-{Urgent:0,Soon:1,Routine:2}[b.urgency]));
+  const totalHandled = OVERNIGHT_SEED.length;
+  const urgentCount = bookings.filter(b=>b.urgency==='Urgent').length;
+  const allClear = emergencies.length===0 && bookings.length===0;
+
+  return (
+    <div className="max-w-5xl mx-auto fade">
+      <div className="flex items-center gap-3 mb-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Morning review</h1>
+        <span className="text-xs sub">overnight · handled by AI while closed</span>
+      </div>
+      {/* briefing line */}
+      <div className="card p-3 mb-5 text-sm flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span><b>{totalHandled}</b> overnight calls</span>
+        <span className="sub">·</span>
+        <span style={{color:'#c2410c'}}><b>{urgentCount}</b> urgent — need a same-day slot</span>
+        <span className="sub">·</span>
+        <span style={{color:'#b91c1c'}}><b>{OVERNIGHT_SEED.filter(o=>o.urgency==='Emergency').length}</b> emergency → 999</span>
+        <span className="sub">·</span>
+        <span className="sub">{bookings.length+emergencies.length} left to clear</span>
+      </div>
+
+      {allClear && <div className="card p-10 text-center sub">✓ Overnight queue cleared. Nice work.</div>}
+
+      {/* emergency awareness strip */}
+      {emergencies.length>0 && (
+        <div className="mb-5">
+          <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{color:'#b91c1c'}}>Handled overnight — for your awareness</div>
+          {emergencies.map(o=>(
+            <div key={o.id} className="card p-4 mb-2 fade" style={{borderColor:'#fca5a5'}}>
+              <div className="flex items-start gap-2">
+                <EmergencyBadgeIcon/>
+                <div className="flex-1">
+                  <div className="text-sm font-semibold" style={{color:'#b91c1c'}}>{o.name} · {o.reason}</div>
+                  <div className="text-xs sub mt-0.5">MRN {o.mrn} · called {o.time} · {o.advice}</div>
+                  <div className="text-xs sub mt-1">Confirm the patient was followed up — they were advised 999 but did not get a practice booking.</div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button onClick={()=>onCallback(o)} className="lift-btn text-white text-sm px-3 py-1.5 rounded-lg" style={{background:'#dc2626'}}>Call patient back</button>
+                <button onClick={()=>onAck(o)} className="edit-btn border line text-sm px-3 py-1.5 rounded-lg">Mark followed up</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* triaged bookings */}
+      {bookings.length>0 && (
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide sub mb-2">Provisional bookings — confirm to notify patient</div>
+          {bookings.map(o=><OvernightCard key={o.id} o={o} onConfirm={onConfirm} onEdit={onEdit} onReject={onReject}/>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- App ---------- */
 function App(){
   const [nav,setNav] = useState('calls');
@@ -425,6 +534,7 @@ function App(){
   ]);
   const [notes,setNotes] = useState([]);
   const [bellOpen,setBell] = useState(false);
+  const [overnight,setOvernight] = useState(OVERNIGHT_SEED);
   const notified = useRef(new Set());
 
   // simulation tick
@@ -480,18 +590,47 @@ function App(){
     setSel(c.id);
     setNotes(n=>[{ id:'cb'+c.id+Date.now(), type:'booking', read:false, callId:c.id, text:`Calling back ${c.name}`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
   }
+  // overnight / morning review
+  function confirmOvernight(o, editedReason){
+    const reason = editedReason || o.reason;
+    const slot = nextSlot(bookings, o.urgency);
+    setBookings(b=>[...b,{ id:Date.now(), name:o.name, reason, urgency:o.urgency, ...slot }]);
+    setOvernight(list=>list.map(x=>x.id===o.id?{...x,status:'confirmed'}:x));
+    setNotes(n=>[{ id:'ov'+o.id, type:'booking', read:false, text:`✓ ${o.name} booked from overnight — ${DAYS[slot.day]} ${slot.time}`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
+  }
+  function editOvernight(o, reason){ setOvernight(list=>list.map(x=>x.id===o.id?{...x,reason}:x)); }
+  function rejectOvernight(o){ setOvernight(list=>list.map(x=>x.id===o.id?{...x,status:'rejected'}:x)); }
+  function ackOvernight(o){ setOvernight(list=>list.map(x=>x.id===o.id?{...x,status:'followed-up'}:x)); }
+  function callbackOvernight(o){
+    setOvernight(list=>list.map(x=>x.id===o.id?{...x,status:'followed-up'}:x));
+    setNotes(n=>[{ id:'ovc'+o.id, type:'booking', read:false, text:`Calling back ${o.name} (overnight emergency)`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
+  }
+
   function openBell(){ setBell(o=>!o); if(!bellOpen) setNotes(n=>n.map(x=>({...x,read:true}))); }
   function pickNote(n){ setBell(false); setNav('calls'); if(n.callId) setSel(n.callId); }
 
+  const morningCount = overnight.filter(o=>o.status==='pending').length;
   return (
     <div className="flex">
-      <Sidebar nav={nav} go={setNav}/>
+      <Sidebar nav={nav} go={setNav} morningCount={morningCount}/>
       <div className="flex-1 min-w-0">
         <header className="flex items-center gap-3 px-8 py-3 border-b line bg-white sticky top-0 z-10">
           <div className="ml-auto"><Bell notes={notes} open={bellOpen} onOpen={openBell} onPick={pickNote}/></div>
         </header>
         <main className="px-8 py-7">
-          {nav==='calls' && <LiveCalls calls={calls} sel={sel} setSel={setSel} onApprove={approve} onReject={reject} onEdit={editProposed} onAck={ack} onCallback={callback}/>}
+          {nav==='calls' && (
+            <div className="max-w-7xl mx-auto">
+              {morningCount>0 && (
+                <button onClick={()=>setNav('morning')} className="hover-lift w-full text-left mb-5 rounded-xl p-3 flex items-center gap-3" style={{background:'rgba(99,102,241,0.08)',border:'1px solid rgba(99,102,241,0.25)'}}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+                  <span className="text-sm flex-1"><b>{morningCount}</b> calls were captured overnight and need review</span>
+                  <span className="text-sm accent-t font-medium">Open morning review →</span>
+                </button>
+              )}
+              <LiveCalls calls={calls} sel={sel} setSel={setSel} onApprove={approve} onReject={reject} onEdit={editProposed} onAck={ack} onCallback={callback}/>
+            </div>
+          )}
+          {nav==='morning' && <MorningReview overnight={overnight} onConfirm={confirmOvernight} onEdit={editOvernight} onReject={rejectOvernight} onAck={ackOvernight} onCallback={callbackOvernight}/>}
           {nav==='calendar' && <Calendar bookings={bookings}/>}
         </main>
       </div>
