@@ -29,6 +29,7 @@
   .card-exit{ transition:opacity .25s ease, transform .25s ease; }
   .card-exit.removing{ opacity:0; transform:translateY(-8px); pointer-events:none; }
   .chat-anim{ transition:height .35s ease-in-out, box-shadow .35s ease-in-out, border-radius .35s ease-in-out; overflow:hidden; }
+  .col-anim{ transition:width .35s ease-in-out, margin .35s ease-in-out, opacity .3s ease-in-out; }
   .card{ background:#fff; border:1px solid var(--line); border-radius:16px; }
   .row:hover{ background:var(--soft); }
   .fade{ animation:f .25s ease-out; } @keyframes f{ from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:none;} }
@@ -333,13 +334,13 @@ function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onC
         <h1 className="text-2xl font-semibold tracking-tight">Live calls</h1>
         {active.length>0 && <span className="text-xs font-medium px-2 py-1 rounded-full" style={{background:'var(--accent-soft)',color:'#0f766e'}}>{active.length} on the line</span>}
       </div>
-      <div className="grid grid-cols-12 gap-5">
-        <div className="col-span-3">
+      <div className="flex items-start">
+        <div className="col-anim overflow-hidden" style={{flex:'0 0 auto', width: expanded?0:'24%', marginRight: expanded?0:20, opacity: expanded?0:1}}>
           <div className="text-xs font-semibold sub uppercase tracking-wide mb-3">On the line</div>
           {calls.map(c=><CallCard key={c.id} c={c} active={sel===c.id} onClick={()=>setSel(c.id)} onCallback={onCallback}/>)}
         </div>
-        <div className="col-span-6"><CallDetail c={selCall} expanded={expanded} onToggleExpand={()=>setExpanded(e=>!e)}/></div>
-        <div className="col-span-3"><ApprovalsPanel calls={calls} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={setSel} expanded={expanded}/></div>
+        <div style={{flex:'1 1 0%', minWidth:0, marginRight:20}}><CallDetail c={selCall} expanded={expanded} onToggleExpand={()=>setExpanded(e=>!e)}/></div>
+        <div style={{flex:'0 0 24%'}}><ApprovalsPanel calls={calls} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={setSel} expanded={expanded}/></div>
       </div>
     </div>
   );
