@@ -146,6 +146,15 @@ function AlertIcon({ size=18, cls='' }){
 function EmergencyBadgeIcon({ size=16 }){
   return <span className="inline-flex items-center justify-center" style={{background:'rgba(239,68,68,0.12)',borderRadius:999,padding:6}}><AlertIcon size={size} cls="emergency-icon"/></span>;
 }
+function MaxIcon({ expanded }){
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {expanded
+        ? <path d="M9 9H4M9 9V4M15 9h5M15 9V4M9 15H4M9 15v5M15 15h5M15 15v5"/>
+        : <path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M16 21h3a2 2 0 002-2v-3M8 21H5a2 2 0 01-2-2v-3"/>}
+    </svg>
+  );
+}
 
 /* ---------- Live Calls board ---------- */
 function CallCard({ c, active, onClick, onCallback }){
@@ -176,31 +185,66 @@ function CallCard({ c, active, onClick, onCallback }){
   );
 }
 
-function CallDetail({ c }){
+function CallDetail({ c, expanded, onToggleExpand }){
   const boxRef = useRef(null);
-  useEffect(()=>{ if(boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight; },[c&&c.lines.length]);
-  if(!c) return <div className="card flex items-center justify-center sub text-sm" style={{height:600}}>Select a call to listen in.</div>;
+  const prevLen = useRef(0);
+  const [atBottom,setAtBottom] = useState(true);
+  const [hasNew,setHasNew] = useState(false);
+
+  // reset when switching calls
+  useEffect(()=>{
+    setAtBottom(true); setHasNew(false);
+    prevLen.current = c ? c.lines.length : 0;
+    requestAnimationFrame(()=>{ const el=boxRef.current; if(el) el.scrollTop = el.scrollHeight; });
+  },[c&&c.id]);
+
+  // new line arrived
+  useEffect(()=>{
+    const el = boxRef.current; if(!el||!c) return;
+    if(c.lines.length > prevLen.current){
+      if(atBottom) el.scrollTop = el.scrollHeight; else setHasNew(true);
+    }
+    prevLen.current = c.lines.length;
+  },[c&&c.lines.length]);
+
+  function onScroll(){
+    const el = boxRef.current; if(!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    setAtBottom(near); if(near) setHasNew(false);
+  }
+  function jumpBottom(){ const el=boxRef.current; if(el) el.scrollTop=el.scrollHeight; setHasNew(false); setAtBottom(true); }
+
+  const h = expanded ? 'calc(100vh - 150px)' : 600;
+  if(!c) return <div className="card flex items-center justify-center sub text-sm" style={{height:h}}>Select a call to listen in.</div>;
   const st = STATUS[c.status];
   return (
-    <div className="card flex flex-col" style={{height:600}}>
-      <div className="px-4 py-3 border-b line flex items-center justify-between">
-        <div>
-          <div className="text-sm font-semibold">{c.name||'Identifying caller…'}</div>
-          <div className="text-xs sub">{c.mrn?`MRN ${c.mrn} · `:''}{c.phone}{c.dob?` · DOB ${c.dob}`:''}</div>
+    <div className="card flex flex-col" style={{height:h}}>
+      <div className="px-4 py-3 border-b line flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold truncate">{c.name||'Identifying caller…'}</div>
+          <div className="text-xs sub truncate">{c.mrn?`MRN ${c.mrn} · `:''}{c.phone}{c.dob?` · DOB ${c.dob}`:''}</div>
         </div>
-        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{background:st.c+'22',color:st.c}}>{st.label}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{background:st.c+'22',color:st.c}}>{st.label}</span>
+          <button onClick={onToggleExpand} title={expanded?'Collapse chat':'Expand chat'} className="sub border line rounded-lg p-1.5 hover:bg-gray-50">
+            <MaxIcon expanded={expanded}/>
+          </button>
+        </div>
       </div>
       {/* transcript */}
-      <div ref={boxRef} className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
-        <div className="text-[11px] sub uppercase tracking-wide mb-1">Live transcript</div>
-        {c.lines.length===0 && <div className="sub text-sm">Connecting…</div>}
-        {c.lines.map((m,i)=> m.who==='sys' ? (
-          <div key={i} className="text-center text-xs rounded-md py-1.5 px-3 fade" style={{background:'#fef2f2',color:'#b91c1c'}}>{m.t}</div>
-        ) : (
-          <div key={i} className={`flex ${m.who==='ai'?'justify-start':'justify-end'} fade`}>
-            <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.who==='ai'?'accent text-white rounded-tl-sm':'soft border line rounded-tr-sm'}`} style={m.who!=='ai'?{background:'var(--soft)'}:{}}>{m.t}</div>
-          </div>
-        ))}
+      <div className="relative flex-1 min-h-0">
+        <div ref={boxRef} onScroll={onScroll} className="nice-scroll h-full overflow-y-auto p-4 space-y-2" style={{scrollBehavior:'smooth'}}>
+          <div className="text-[11px] sub uppercase tracking-wide mb-1">Live transcript</div>
+          {c.lines.length===0 && <div className="sub text-sm">Connecting…</div>}
+          {c.lines.map((m,i)=> m.who==='sys' ? (
+            <div key={i} className="text-center text-xs rounded-md py-1.5 px-3 fade" style={{background:'#fef2f2',color:'#b91c1c'}}>{m.t}</div>
+          ) : (
+            <div key={i} className={`flex ${m.who==='ai'?'justify-start':'justify-end'} fade`}>
+              <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.who==='ai'?'accent text-white rounded-tl-sm':'soft border line rounded-tr-sm'}`} style={{...(m.who!=='ai'?{background:'var(--soft)'}:{}),wordBreak:'break-word'}}>{m.t}</div>
+            </div>
+          ))}
+        </div>
+        {hasNew && <button onClick={jumpBottom} className="lift-btn absolute left-1/2 -translate-x-1/2 bottom-3 accent text-white text-xs px-3 py-1.5 rounded-full shadow-lg">New messages ↓</button>}
       </div>
       {/* captured strip */}
       <div className="border-t line p-3 grid grid-cols-4 gap-2 text-xs">
@@ -257,10 +301,10 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
   );
 }
 
-function ApprovalsPanel({ calls, onApprove, onReject, onEdit, onAck, onOpen }){
+function ApprovalsPanel({ calls, onApprove, onReject, onEdit, onAck, onOpen, expanded }){
   const queue = calls.filter(c=> c.status==='await-approval' || (c.status==='emergency' && !c.ack));
   return (
-    <div className="flex flex-col" style={{height:600}}>
+    <div className="flex flex-col" style={{height: expanded?'calc(100vh - 150px)':600}}>
       <div className="flex items-center gap-2 mb-3 shrink-0">
         <span className="text-xs font-semibold sub uppercase tracking-wide">Needs staff action</span>
         {queue.length>0 && <span className="text-[10px] text-white px-1.5 rounded-full" style={{background:'#f59e0b'}}>{queue.length}</span>}
@@ -274,6 +318,7 @@ function ApprovalsPanel({ calls, onApprove, onReject, onEdit, onAck, onOpen }){
 }
 
 function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onCallback }){
+  const [expanded,setExpanded] = useState(false);
   const active = calls.filter(c=>!['booked','ended'].includes(c.status));
   const selCall = calls.find(c=>c.id===sel) || null;
   return (
@@ -284,12 +329,14 @@ function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onC
         <span className="text-xs font-medium px-2 py-1 rounded-full" style={{background:'var(--accent-soft)',color:'#0f766e'}}>{active.length} on the line</span>
       </div>
       <div className="grid grid-cols-12 gap-5">
-        <div className="col-span-3">
-          <div className="text-xs font-semibold sub uppercase tracking-wide mb-3">On the line</div>
-          {calls.map(c=><CallCard key={c.id} c={c} active={sel===c.id} onClick={()=>setSel(c.id)} onCallback={onCallback}/>)}
-        </div>
-        <div className="col-span-6"><CallDetail c={selCall}/></div>
-        <div className="col-span-3"><ApprovalsPanel calls={calls} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={setSel}/></div>
+        {!expanded && (
+          <div className="col-span-3">
+            <div className="text-xs font-semibold sub uppercase tracking-wide mb-3">On the line</div>
+            {calls.map(c=><CallCard key={c.id} c={c} active={sel===c.id} onClick={()=>setSel(c.id)} onCallback={onCallback}/>)}
+          </div>
+        )}
+        <div className={expanded?'col-span-9':'col-span-6'}><CallDetail c={selCall} expanded={expanded} onToggleExpand={()=>setExpanded(e=>!e)}/></div>
+        <div className="col-span-3"><ApprovalsPanel calls={calls} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={setSel} expanded={expanded}/></div>
       </div>
     </div>
   );
