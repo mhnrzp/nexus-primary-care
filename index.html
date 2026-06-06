@@ -15,6 +15,7 @@
   input,select,textarea{ -webkit-appearance:none; appearance:none; border:1px solid var(--line); border-radius:12px; background-color:#fff; background-clip:padding-box; outline:none; box-shadow:none; color:inherit; }
   input:focus,select:focus,textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 2px rgba(13,148,136,.12); outline:none; }
   select{ background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>"); background-repeat:no-repeat; background-position:right 8px center; padding-right:26px; }
+  a{ color:inherit; text-decoration:none; }
   .sub{ color:var(--sub); } .line{ border-color:var(--line); } .soft{ background:var(--soft); }
   .accent{ background:var(--accent); } .accent-t{ color:var(--accent); }
   button{ font-family:inherit; cursor:pointer; border:none; background:none; }
@@ -493,7 +494,7 @@ function ProfileSwitcher({ current }){
   return (
     <div className="mt-auto px-3 relative">
       {open && (
-        <div className="card p-1.5 mb-2 fade" style={{boxShadow:'0 8px 30px rgba(0,0,0,.12)'}}>
+        <div className="card p-1.5 mb-2 fade">
           <div className="text-[10px] font-semibold sub uppercase tracking-wide px-2 py-1">Switch panel</div>
           {profiles.map(p=>(
             <a key={p.key} href={p.href} className="row flex items-center gap-2 px-2 py-2 rounded-lg">
