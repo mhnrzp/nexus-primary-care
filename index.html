@@ -30,6 +30,10 @@
   .card-exit.removing{ opacity:0; transform:translateY(-8px); pointer-events:none; }
   .chat-anim{ transition:height .35s ease-in-out, box-shadow .35s ease-in-out, border-radius .35s ease-in-out; overflow:hidden; }
   .col-anim{ transition:width .35s ease-in-out, margin .35s ease-in-out, opacity .3s ease-in-out; }
+  .backdrop{ position:absolute; inset:0; background:rgba(15,23,42,.4); animation:bdin .22s ease; }
+  @keyframes bdin{ from{opacity:0;} to{opacity:1;} }
+  .modal-in{ animation:modin .26s cubic-bezier(.2,.8,.2,1); }
+  @keyframes modin{ from{opacity:0; transform:scale(.97);} to{opacity:1; transform:scale(1);} }
   .card{ background:#fff; border:1px solid var(--line); border-radius:16px; }
   .row:hover{ background:var(--soft); }
   .fade{ animation:f .25s ease-out; } @keyframes f{ from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:none;} }
@@ -189,7 +193,7 @@ function CallCard({ c, active, onClick, onCallback }){
   );
 }
 
-function CallDetail({ c, expanded, onToggleExpand }){
+function CallDetail({ c, overlay, onToggleExpand }){
   const boxRef = useRef(null);
   const prevLen = useRef(0);
   const [atBottom,setAtBottom] = useState(true);
@@ -218,11 +222,11 @@ function CallDetail({ c, expanded, onToggleExpand }){
   }
   function jumpBottom(){ const el=boxRef.current; if(el) el.scrollTop=el.scrollHeight; setHasNew(false); setAtBottom(true); }
 
-  const h = expanded ? 'calc(100vh - 150px)' : 600;
-  if(!c) return <div className="card chat-anim flex items-center justify-center sub text-sm" style={{height:h}}>Select a call to listen in.</div>;
+  const h = overlay ? 'calc(100vh - 90px)' : 600;
+  if(!c) return <div className="card flex items-center justify-center sub text-sm" style={{height:h}}>Select a call to listen in.</div>;
   const st = STATUS[c.status];
   return (
-    <div className="card chat-anim flex flex-col" style={{height:h}}>
+    <div className="card flex flex-col" style={{height:h, width:'100%'}}>
       <div className="px-4 py-3 border-b line flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold truncate">{c.name||'Identifying caller…'}</div>
@@ -230,8 +234,8 @@ function CallDetail({ c, expanded, onToggleExpand }){
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{background:st.c+'22',color:st.c}}>{st.label}</span>
-          <button onClick={onToggleExpand} title={expanded?'Collapse chat':'Expand chat'} className="sub border line rounded-lg p-1.5 hover:bg-gray-50">
-            <MaxIcon expanded={expanded}/>
+          <button onClick={onToggleExpand} title={overlay?'Close':'Expand chat'} className="sub border line rounded-lg p-1.5 hover:bg-gray-50">
+            <MaxIcon expanded={overlay}/>
           </button>
         </div>
       </div>
@@ -307,10 +311,10 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
   );
 }
 
-function ApprovalsPanel({ calls, onApprove, onReject, onEdit, onAck, onOpen, expanded }){
+function ApprovalsPanel({ calls, onApprove, onReject, onEdit, onAck, onOpen }){
   const queue = calls.filter(c=> c.status==='await-approval' || (c.status==='emergency' && !c.ack));
   return (
-    <div className="flex flex-col chat-anim" style={{height: expanded?'calc(100vh - 150px)':600}}>
+    <div className="flex flex-col" style={{height:600}}>
       <div className="flex items-center gap-2 mb-3 shrink-0">
         <span className="text-xs font-semibold sub uppercase tracking-wide">Needs staff action</span>
         {queue.length>0 && <span className="inline-flex items-center justify-center text-white font-bold" style={{minWidth:20,height:20,borderRadius:'50%',fontSize:11,background:'#f59e0b'}}>{queue.length}</span>}
@@ -339,9 +343,17 @@ function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onC
           <div className="text-xs font-semibold sub uppercase tracking-wide mb-3">On the line</div>
           {calls.map(c=><CallCard key={c.id} c={c} active={sel===c.id} onClick={()=>setSel(c.id)} onCallback={onCallback}/>)}
         </div>
-        <div style={{flex:'1 1 0%', minWidth:0, marginRight:20}}><CallDetail c={selCall} expanded={expanded} onToggleExpand={()=>setExpanded(e=>!e)}/></div>
-        <div style={{flex:'0 0 24%'}}><ApprovalsPanel calls={calls} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={setSel} expanded={expanded}/></div>
+        <div style={{flex:'1 1 0%', minWidth:0, marginRight:20}}><CallDetail c={selCall} onToggleExpand={()=>setExpanded(true)}/></div>
+        <div style={{flex:'0 0 24%'}}><ApprovalsPanel calls={calls} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={setSel}/></div>
       </div>
+      {expanded && selCall && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center p-6" onClick={()=>setExpanded(false)}>
+          <div className="backdrop"></div>
+          <div className="modal-in relative w-full" style={{maxWidth:920}} onClick={e=>e.stopPropagation()}>
+            <CallDetail c={selCall} overlay onToggleExpand={()=>setExpanded(false)}/>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
