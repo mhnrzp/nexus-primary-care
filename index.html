@@ -32,6 +32,11 @@
   .emergency-icon{ color:#EF4444; animation:emergencyGlow 1.4s ease-in-out infinite; }
   @keyframes emergencyGlow{ 0%{filter:drop-shadow(0 0 2px rgba(239,68,68,0.4));} 50%{filter:drop-shadow(0 0 10px rgba(239,68,68,0.9));} 100%{filter:drop-shadow(0 0 2px rgba(239,68,68,0.4));} }
   @media (prefers-reduced-motion: reduce){ .call-icon,.call-icon-wrapper::before,.emergency-dot,.emergency-icon{ animation:none; } }
+  .nice-scroll{ overflow-x:hidden; scroll-behavior:smooth; }
+  .nice-scroll::-webkit-scrollbar{ width:6px; }
+  .nice-scroll::-webkit-scrollbar-track{ background:transparent; }
+  .nice-scroll::-webkit-scrollbar-thumb{ background:rgba(13,148,136,0.35); border-radius:999px; }
+  .nice-scroll::-webkit-scrollbar-thumb:hover{ background:rgba(13,148,136,0.6); }
   ::-webkit-scrollbar{ width:8px; } ::-webkit-scrollbar-thumb{ background:#e4e4e7; border-radius:4px; }
 </style>
 </head>
@@ -246,13 +251,15 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
 function ApprovalsPanel({ calls, onApprove, onReject, onEdit, onAck, onOpen }){
   const queue = calls.filter(c=> c.status==='await-approval' || (c.status==='emergency' && !c.ack));
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
+    <div className="flex flex-col" style={{height:600}}>
+      <div className="flex items-center gap-2 mb-3 shrink-0">
         <span className="text-xs font-semibold sub uppercase tracking-wide">Needs staff action</span>
         {queue.length>0 && <span className="text-[10px] text-white px-1.5 rounded-full" style={{background:'#f59e0b'}}>{queue.length}</span>}
       </div>
-      {queue.length===0 && <div className="card p-6 text-center text-sm sub">Nothing waiting. Booking proposals and emergencies appear here for you to approve.</div>}
-      {queue.map(c=><ApprovalCard key={c.id} c={c} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={onOpen}/>)}
+      <div className="nice-scroll flex-1 overflow-y-auto pr-1.5 pb-2" style={{minHeight:0}}>
+        {queue.length===0 && <div className="card p-6 text-center text-sm sub">Nothing waiting. Booking proposals and emergencies appear here for you to approve.</div>}
+        {queue.map(c=><ApprovalCard key={c.id} c={c} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={onOpen}/>)}
+      </div>
     </div>
   );
 }
