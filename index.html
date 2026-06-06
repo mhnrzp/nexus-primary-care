@@ -329,9 +329,9 @@ function ApprovalsPanel({ calls, onApprove, onReject, onEdit, onAck, onOpen }){
 
 function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onCallback }){
   const [expanded,setExpanded] = useState(false);
-  const active = calls.filter(c=>!['booked','ended'].includes(c.status));
-  // board: drop booked calls; keep ended only if it's an urgent missed call (for Call back)
-  const board = calls.filter(c=> c.status==='booked' ? false : (c.status==='ended' ? c.urgency==='Urgent' : true));
+  const active = calls.filter(c=>!['booked','ended'].includes(c.status) && !c.ack);
+  // board: drop booked calls and acknowledged emergencies; keep ended only if urgent (for Call back)
+  const board = calls.filter(c=> (c.status==='booked' || c.ack) ? false : (c.status==='ended' ? c.urgency==='Urgent' : true));
   const selCall = calls.find(c=>c.id===sel) || null;
   return (
     <div className="max-w-7xl mx-auto fade">
