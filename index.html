@@ -394,30 +394,6 @@ function Sidebar({ nav, go, morningCount }){
   );
 }
 
-function Bell({ notes, onOpen, open, onPick }){
-  const unread = notes.filter(n=>!n.read).length;
-  return (
-    <div className="relative">
-      <button onClick={onOpen} className="relative w-9 h-9 rounded-xl border line hover:bg-gray-50 flex items-center justify-center">
-        🔔{unread>0 && <span className="absolute -top-1 -right-1 text-[10px] text-white rounded-full px-1.5" style={{background:'#ef4444'}}>{unread}</span>}
-      </button>
-      {open && (
-        <div className="absolute right-0 mt-2 w-80 card p-2 z-20 fade" style={{boxShadow:'0 12px 40px rgba(0,0,0,.1)'}}>
-          <div className="text-xs font-semibold sub px-2 py-1">Notifications</div>
-          {notes.length===0 && <div className="text-sm sub text-center py-6">Nothing yet.</div>}
-          {notes.map(n=>(
-            <button key={n.id} onClick={()=>onPick(n)} className="row w-full text-left px-2 py-2 rounded-lg flex gap-2 items-start">
-              <span className="mt-0.5" style={{color:n.type==='emergency'?'#ef4444':'#0d9488'}}>{n.type==='emergency'? <AlertIcon size={15} cls="emergency-icon"/> : '📅'}</span>
-              <div className="flex-1"><div className="text-sm">{n.text}</div><div className="text-[11px] sub">{n.time}</div></div>
-              {!n.read && <span className="w-2 h-2 rounded-full accent mt-1"></span>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ---------- Overnight (out-of-hours AI) captures ---------- */
 const OVERNIGHT_SEED = [
   { id:'o1', name:'Tom Bennett',    mrn:'OAK-07734', dob:'30 Jun 1968', reason:'Chest pain + breathlessness', urgency:'Emergency', time:'01:12', status:'pending', advice:'999 advised · no booking', transcript:[['ai','Oakfield Surgery — we\'re closed, but I can help. Your name?'],['pt','Tom Bennett, I\'ve got chest pain and I feel breathless.'],['ai','This needs emergency help now — please call 999. I\'m logging this for the team.']] },
@@ -533,7 +509,6 @@ function App(){
     { id:2, name:'Grace Nolan', reason:'Asthma review', urgency:'Routine', day:3, hour:9, time:'09:00' },
   ]);
   const [notes,setNotes] = useState([]);
-  const [bellOpen,setBell] = useState(false);
   const [overnight,setOvernight] = useState(OVERNIGHT_SEED);
   const notified = useRef(new Set());
 
@@ -606,17 +581,11 @@ function App(){
     setNotes(n=>[{ id:'ovc'+o.id, type:'booking', read:false, text:`Calling back ${o.name} (overnight emergency)`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
   }
 
-  function openBell(){ setBell(o=>!o); if(!bellOpen) setNotes(n=>n.map(x=>({...x,read:true}))); }
-  function pickNote(n){ setBell(false); setNav('calls'); if(n.callId) setSel(n.callId); }
-
   const morningCount = overnight.filter(o=>o.status==='pending').length;
   return (
     <div className="flex">
       <Sidebar nav={nav} go={setNav} morningCount={morningCount}/>
       <div className="flex-1 min-w-0">
-        <header className="flex items-center gap-3 px-8 py-3 border-b line bg-white sticky top-0 z-10">
-          <div className="ml-auto"><Bell notes={notes} open={bellOpen} onOpen={openBell} onPick={pickNote}/></div>
-        </header>
         <main className="px-8 py-7">
           {nav==='calls' && (
             <div className="max-w-7xl mx-auto">
