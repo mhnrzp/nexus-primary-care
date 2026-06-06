@@ -536,10 +536,14 @@ const OVERNIGHT_SEED = [
   { id:'o7', name:'Derek Coombs',   mrn:'OAK-06077', dob:'03 Dec 1981', reason:'Fit note query', urgency:'Routine', time:'00:20', status:'pending', transcript:[['ai','How can I help?'],['pt','I need a fit note extended.'],['ai','I\'ll pass this to the admin team to action in the morning.']] },
 ];
 
-function OvernightCard({ o, onConfirm, onEdit, onReject }){
+function OvernightCard({ o, onConfirm, onReject }){
   const [open,setOpen] = useState(false);
   const [editing,setEditing] = useState(false);
+  const [touched,setTouched] = useState(false);
   const [reason,setReason] = useState(o.reason);
+  const defDay = Math.min(o.urgency==='Urgent'?0:o.urgency==='Soon'?1:3,5);
+  const [day,setDay] = useState(defDay);
+  const [hour,setHour] = useState(9);
   const u = TIER[o.urgency];
   const slot = o.urgency==='Urgent'?'Same-day today':o.urgency==='Soon'?'Within 48h':'Routine';
   return (
@@ -554,21 +558,36 @@ function OvernightCard({ o, onConfirm, onEdit, onReject }){
             <span className="text-[11px] sub">· called {o.time}</span>
           </div>
           <div className="text-[11px] sub mt-0.5">MRN {o.mrn} · DOB {o.dob}</div>
-          {editing
-            ? <input value={reason} onChange={e=>setReason(e.target.value)} className="w-full mt-2 px-3 py-1.5 text-sm" style={{background:'var(--soft)'}}/>
-            : <div className="text-sm mt-1.5">{o.reason}</div>}
-          <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px]">
-            <span className="px-2 py-0.5 rounded-full font-medium" style={{background:u.bg,color:u.fg}}>{slot}</span>
-            <span className="sub">not yet notified</span>
-            <button onClick={()=>setOpen(v=>!v)} className="accent-t font-medium">{open?'Hide transcript':'View transcript'}</button>
-          </div>
-          {open && <div className="mt-2 border-t line pt-2 space-y-1.5">{o.transcript.map((m,i)=>(<div key={i} className={`text-xs ${m[0]==='ai'?'accent-t':''}`}><b>{m[0]==='ai'?'AI':o.name.split(' ')[0]}:</b> {m[1]}</div>))}</div>}
+          {editing ? (
+            <div className="mt-2 space-y-2">
+              <input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Reason" className="w-full px-3 py-1.5 text-sm" style={{background:'var(--soft)'}}/>
+              <div className="flex gap-2">
+                <select value={day} onChange={e=>setDay(+e.target.value)} className="flex-1 px-2 py-1.5 text-sm" style={{background:'var(--soft)'}}>
+                  {DAYS.map((d,i)=><option key={i} value={i}>{d} {DATES[i]}</option>)}
+                </select>
+                <select value={hour} onChange={e=>setHour(+e.target.value)} className="px-2 py-1.5 text-sm" style={{background:'var(--soft)'}}>
+                  {HOURS.map(h=><option key={h} value={h}>{String(h).padStart(2,'0')}:00</option>)}
+                </select>
+              </div>
+              <div className="text-[11px] sub">Appointment: <b>{DAYS[day]} {DATES[day]} · {String(hour).padStart(2,'0')}:00</b></div>
+            </div>
+          ) : (
+            <>
+              <div className="text-sm mt-1.5">{o.reason}</div>
+              <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px]">
+                <span className="px-2 py-0.5 rounded-full font-medium" style={{background:u.bg,color:u.fg}}>{slot}</span>
+                <span className="sub">not yet notified</span>
+                <button onClick={()=>setOpen(v=>!v)} className="accent-t font-medium">{open?'Hide transcript':'View transcript'}</button>
+              </div>
+            </>
+          )}
+          {open && !editing && <div className="mt-2 border-t line pt-2 space-y-1.5">{o.transcript.map((m,i)=>(<div key={i} className={`text-xs ${m[0]==='ai'?'accent-t':''}`}><b>{m[0]==='ai'?'AI':o.name.split(' ')[0]}:</b> {m[1]}</div>))}</div>}
         </div>
         {/* right: actions */}
         <div className="shrink-0 flex flex-col gap-2" style={{width:148}}>
-          <button onClick={()=>onConfirm(o, editing?reason:null)} className="approve-btn accent text-white text-sm py-2 rounded-lg">Confirm &amp; book</button>
+          <button onClick={()=>onConfirm(o, touched?{reason, slot:{day,hour,time:`${String(hour).padStart(2,'0')}:00`}}:null)} className="approve-btn accent text-white text-sm py-2 rounded-lg">Confirm &amp; book</button>
           <div className="flex gap-2">
-            <button onClick={()=>{ if(editing){onEdit(o,reason);setEditing(false);} else setEditing(true); }} className="edit-btn border line text-sm py-1.5 rounded-lg flex-1">{editing?'Save':'Edit'}</button>
+            <button onClick={()=>{ setEditing(e=>!e); setTouched(true); }} className="edit-btn border line text-sm py-1.5 rounded-lg flex-1">{editing?'Done':'Edit'}</button>
             <button onClick={()=>onReject(o)} className="reject-btn border line text-sm py-1.5 rounded-lg flex-1">Reject</button>
           </div>
         </div>
@@ -721,9 +740,9 @@ function App(){
     setNotes(n=>[{ id:'cb'+c.id+Date.now(), type:'booking', read:false, callId:c.id, text:`Calling back ${c.name}`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
   }
   // overnight / morning review
-  function confirmOvernight(o, editedReason){
-    const reason = editedReason || o.reason;
-    const slot = nextSlot(bookings, o.urgency);
+  function confirmOvernight(o, override){
+    const reason = (override&&override.reason) || o.reason;
+    const slot = (override&&override.slot) || nextSlot(bookings, o.urgency);
     setBookings(b=>[...b,{ id:Date.now(), name:o.name, mrn:o.mrn, dob:o.dob, reason, urgency:o.urgency, source:'Overnight AI', confidence:'High', ...slot }]);
     setOvernight(list=>list.map(x=>x.id===o.id?{...x,status:'confirmed'}:x));
     setNotes(n=>[{ id:'ov'+o.id, type:'booking', read:false, text:`✓ ${o.name} booked from overnight — ${DAYS[slot.day]} ${slot.time}`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
