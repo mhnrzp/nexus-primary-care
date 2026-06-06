@@ -361,8 +361,42 @@ function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onC
   );
 }
 
-/* ---------- Calendar ---------- */
-function Calendar({ bookings }){
+/* ---------- Calendar (accepted bookings + detail drawer) ---------- */
+function BookingDrawer({ b, onClose, onCancel }){
+  if(!b) return null;
+  const u = TIER[b.urgency];
+  return (
+    <div className="fixed inset-0 z-30 fade" onClick={onClose}>
+      <div className="backdrop"></div>
+      <div onClick={e=>e.stopPropagation()} className="modal-in absolute right-0 top-0 h-screen w-[380px] bg-white border-l line p-6 overflow-y-auto" style={{boxShadow:'-12px 0 40px rgba(0,0,0,.08)'}}>
+        <div className="flex items-center justify-between mb-5">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{background:u.bg,color:u.fg}}>{b.urgency}</span>
+          <button onClick={onClose} className="sub text-lg leading-none">✕</button>
+        </div>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-12 h-12 rounded-full accent text-white flex items-center justify-center font-semibold">{b.name.split(' ').map(n=>n[0]).slice(0,2).join('')}</div>
+          <div><div className="text-lg font-semibold tracking-tight leading-tight">{b.name}</div><div className="text-xs sub">{b.mrn?`MRN ${b.mrn}`:''}{b.dob?` · ${b.dob}`:''}</div></div>
+        </div>
+        <div className="rounded-xl border line p-3 mb-4" style={{background:'var(--soft)'}}>
+          <div className="text-xs font-semibold accent-t mb-1">Accepted booking</div>
+          <div className="text-sm">{DAYS[b.day]} {DATES[b.day]} · {b.time}</div>
+          <div className="text-xs sub mt-0.5">Patient notified by SMS ✓</div>
+        </div>
+        <div className="space-y-3 text-sm">
+          {[['Reason',b.reason],['Urgency',b.urgency+' — '+ (b.urgency==='Urgent'?'same-day':b.urgency==='Soon'?'within 48h':'routine')],['Booked via',b.source||'—'],['Agent confidence',b.confidence||'—']].map((r,i)=>(
+            <div key={i} className="flex justify-between gap-4 border-b line pb-2 last:border-0"><span className="sub">{r[0]}</span><span className="text-right font-medium">{r[1]}</span></div>
+          ))}
+        </div>
+        {b.source && b.source.includes('AI') && <div className="text-[11px] sub mt-3">Captured from full call transcript · red-flag screen negative.</div>}
+        <button onClick={()=>onCancel(b)} className="reject-btn w-full border line text-sm py-2.5 rounded-xl mt-6">Cancel appointment</button>
+      </div>
+    </div>
+  );
+}
+
+function Calendar({ bookings, onCancel }){
+  const [sel,setSel] = useState(null);
+  const selBooking = bookings.find(b=>b.id===sel) || null;
   return (
     <div className="max-w-6xl mx-auto fade">
       <div className="flex items-center gap-3 mb-4">
@@ -379,10 +413,10 @@ function Calendar({ bookings }){
               {DAYS.map((_,di)=>(
                 <div key={di} className="p-1.5 border-b border-l line" style={{minHeight:74}}>
                   {bookings.filter(b=>b.day===di&&b.hour===h).map(b=>(
-                    <div key={b.id} className="rounded-lg px-2 py-1.5 mb-1 fade" style={{background:TIER[b.urgency].bg,color:TIER[b.urgency].fg,borderLeft:'3px solid '+TIER[b.urgency].dot}}>
+                    <button key={b.id} onClick={()=>setSel(b.id)} className="w-full text-left rounded-lg px-2 py-1.5 mb-1 fade transition hover:brightness-95" style={{background:TIER[b.urgency].bg,color:TIER[b.urgency].fg,borderLeft:'3px solid '+TIER[b.urgency].dot}}>
                       <div className="text-[11px] font-mono" style={{opacity:.8}}>{b.time}</div>
                       <div className="text-[13px] font-medium leading-tight truncate">{b.name.split(' ').slice(-1)[0]}</div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               ))}
@@ -390,6 +424,7 @@ function Calendar({ bookings }){
           ))}
         </div>
       </div>
+      <BookingDrawer b={selBooking} onClose={()=>setSel(null)} onCancel={(b)=>{onCancel(b);setSel(null);}}/>
     </div>
   );
 }
@@ -524,8 +559,8 @@ function App(){
   const [calls,setCalls] = useState(makeCalls);
   const [sel,setSel] = useState('c1');
   const [bookings,setBookings] = useState([
-    { id:1, name:'James Patterson', reason:'Knee follow-up', urgency:'Routine', day:2, hour:12, time:'12:00' },
-    { id:2, name:'Grace Nolan', reason:'Asthma review', urgency:'Routine', day:3, hour:9, time:'09:00' },
+    { id:1, name:'James Patterson', mrn:'OAK-04410', dob:'05 Feb 1955', reason:'Knee follow-up', urgency:'Routine', source:'Reception', confidence:'—', day:2, hour:12, time:'12:00' },
+    { id:2, name:'Grace Nolan', mrn:'OAK-05021', dob:'22 Jun 1991', reason:'Asthma review', urgency:'Routine', source:'Reception', confidence:'—', day:3, hour:9, time:'09:00' },
   ]);
   const [notes,setNotes] = useState([]);
   const [overnight,setOvernight] = useState(OVERNIGHT_SEED);
@@ -565,11 +600,12 @@ function App(){
   function approve(c, editedReason){
     const reason = editedReason || c.proposed.reason;
     const slot = nextSlot(bookings, c.proposed.urgency);
-    setBookings(b=>[...b,{ id:Date.now(), name:c.name, reason, urgency:c.proposed.urgency, ...slot }]);
+    setBookings(b=>[...b,{ id:Date.now(), name:c.name, mrn:c.mrn, dob:c.dob, reason, urgency:c.proposed.urgency, source:'AI call', confidence:'High', ...slot }]);
     setCalls(cs=>cs.map(x=>x.id===c.id?{...x,status:'booked'}:x));
     setNotes(n=>[{ id:'bk'+c.id, type:'booking', read:false, callId:c.id, text:`✓ ${c.name} booked — ${DAYS[slot.day]} ${slot.time}`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
   }
   function reject(c){ setCalls(cs=>cs.map(x=>x.id===c.id?{...x,status:'ended'}:x)); }
+  function cancelBooking(b){ setBookings(list=>list.filter(x=>x.id!==b.id)); }
   function editProposed(c, reason){ setCalls(cs=>cs.map(x=>x.id===c.id?{...x,proposed:{...x.proposed,reason}}:x)); }
   function ack(c){ setCalls(cs=>cs.map(x=>x.id===c.id?{...x,ack:true}:x)); }
   function callback(c){
@@ -588,7 +624,7 @@ function App(){
   function confirmOvernight(o, editedReason){
     const reason = editedReason || o.reason;
     const slot = nextSlot(bookings, o.urgency);
-    setBookings(b=>[...b,{ id:Date.now(), name:o.name, reason, urgency:o.urgency, ...slot }]);
+    setBookings(b=>[...b,{ id:Date.now(), name:o.name, mrn:o.mrn, dob:o.dob, reason, urgency:o.urgency, source:'Overnight AI', confidence:'High', ...slot }]);
     setOvernight(list=>list.map(x=>x.id===o.id?{...x,status:'confirmed'}:x));
     setNotes(n=>[{ id:'ov'+o.id, type:'booking', read:false, text:`✓ ${o.name} booked from overnight — ${DAYS[slot.day]} ${slot.time}`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
   }
@@ -619,7 +655,7 @@ function App(){
             </div>
           )}
           {nav==='morning' && <MorningReview overnight={overnight} onConfirm={confirmOvernight} onEdit={editOvernight} onReject={rejectOvernight} onAck={ackOvernight} onCallback={callbackOvernight}/>}
-          {nav==='calendar' && <Calendar bookings={bookings}/>}
+          {nav==='calendar' && <Calendar bookings={bookings} onCancel={cancelBooking}/>}
         </main>
       </div>
     </div>
