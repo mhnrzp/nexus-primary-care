@@ -170,8 +170,14 @@ function CallCard({ c, active, onClick, onCallback }){
   const mmss = `${String(Math.floor(c.secs/60)).padStart(2,'0')}:${String(c.secs%60).padStart(2,'0')}`;
   const liveDot = !['booked','ended'].includes(c.status);
   const missed = c.urgency==='Urgent' && c.status==='ended';
+  // calls that leave the board: booked, acknowledged emergency, or ended (non-urgent) → fade out then unmount
+  const shouldLeave = c.status==='booked' || c.ack || (c.status==='ended' && c.urgency!=='Urgent');
+  const [leaving,setLeaving] = useState(false);
+  const [removed,setRemoved] = useState(false);
+  useEffect(()=>{ if(shouldLeave){ setLeaving(true); const t=setTimeout(()=>setRemoved(true),300); return ()=>clearTimeout(t); } },[shouldLeave]);
+  if(removed) return null;
   return (
-    <div onClick={onClick} className={`card hover-lift p-3 mb-2 fade cursor-pointer ${active?'ring-2':''}`} style={active?{boxShadow:'0 0 0 2px var(--accent)'}:c.status==='emergency'?{borderColor:'#fca5a5'}:{}}>
+    <div onClick={onClick} className={`card hover-lift card-exit p-3 mb-2 fade cursor-pointer ${active?'ring-2':''} ${leaving?'removing':''}`} style={active?{boxShadow:'0 0 0 2px var(--accent)'}:c.status==='emergency'?{borderColor:'#fca5a5'}:{}}>
       <div className="flex items-center gap-2">
         {c.status==='ringing' ? <PhoneRing/> : c.status==='emergency' ? <span className="emergency-dot"></span> : <span className={liveDot?'live':''} style={{color:st.c}}>●</span>}
         <div className="flex-1 min-w-0">
@@ -330,8 +336,10 @@ function ApprovalsPanel({ calls, onApprove, onReject, onEdit, onAck, onOpen }){
 function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onCallback }){
   const [expanded,setExpanded] = useState(false);
   const active = calls.filter(c=>!['booked','ended'].includes(c.status) && !c.ack);
-  // board: drop booked calls and acknowledged emergencies; keep ended only if urgent (for Call back)
-  const board = calls.filter(c=> (c.status==='booked' || c.ack) ? false : (c.status==='ended' ? c.urgency==='Urgent' : true));
+  // pass all calls to the board; each CallCard fades itself out then unmounts when it leaves.
+  // keep ended-urgent (for Call back); count what's actually visible for the empty state.
+  const board = calls.filter(c=> (c.status==='ended' && c.urgency!=='Urgent') ? true : true);
+  const visibleCount = calls.filter(c=> !(c.status==='booked' || c.ack || (c.status==='ended' && c.urgency!=='Urgent'))).length;
   const selCall = calls.find(c=>c.id===sel) || null;
   return (
     <div className="max-w-7xl mx-auto fade">
@@ -344,7 +352,7 @@ function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onC
         <div style={{flex:'0 0 24%', marginRight:20}}>
           <div className="text-xs font-semibold sub uppercase tracking-wide mb-3">On the line</div>
           {board.map(c=><CallCard key={c.id} c={c} active={sel===c.id} onClick={()=>setSel(c.id)} onCallback={onCallback}/>)}
-          {board.length===0 && <div className="text-sm sub py-6 text-center">No active calls.</div>}
+          {visibleCount===0 && <div className="text-sm sub py-6 text-center">No active calls.</div>}
         </div>
         <div style={{flex:'1 1 0%', minWidth:0, marginRight:20}}><CallDetail c={selCall} onToggleExpand={()=>setExpanded(true)}/></div>
         <div style={{flex:'0 0 24%'}}><ApprovalsPanel calls={calls} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={setSel}/></div>
