@@ -22,6 +22,12 @@
   .fade{ animation:f .25s ease-out; } @keyframes f{ from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:none;} }
   .live{ animation:pulse 1.4s infinite; } @keyframes pulse{ 0%{opacity:1;} 50%{opacity:.35;} 100%{opacity:1;} }
   .ring{ animation:rng 1s infinite; } @keyframes rng{ 0%,100%{transform:rotate(0);} 25%{transform:rotate(-12deg);} 75%{transform:rotate(12deg);} }
+  .call-icon-wrapper{ position:relative; display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; flex:none; color:#2563eb; }
+  .call-icon{ animation:phoneRing 1.2s ease-in-out infinite; transform-origin:center; }
+  .call-icon-wrapper::before{ content:''; position:absolute; inset:0; border-radius:50%; border:1px solid rgba(37,99,235,0.35); animation:callPulse 1.4s ease-out infinite; }
+  @keyframes phoneRing{ 0%{transform:rotate(0) scale(1);} 20%{transform:rotate(-12deg) scale(1.05);} 40%{transform:rotate(12deg) scale(1.08);} 60%{transform:rotate(-8deg) scale(1.04);} 80%{transform:rotate(8deg) scale(1.02);} 100%{transform:rotate(0) scale(1);} }
+  @keyframes callPulse{ 0%{transform:scale(1); opacity:.5;} 100%{transform:scale(1.6); opacity:0;} }
+  @media (prefers-reduced-motion: reduce){ .call-icon,.call-icon-wrapper::before{ animation:none; } }
   ::-webkit-scrollbar{ width:8px; } ::-webkit-scrollbar-thumb{ background:#e4e4e7; border-radius:4px; }
 </style>
 </head>
@@ -103,6 +109,16 @@ function makeCalls(){
   ];
 }
 
+/* ---------- phone icon (replaces 📞 emoji) ---------- */
+function PhoneIcon({ size=18, cls='' }){
+  return (
+    <svg className={cls} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 4h4l2 5-2 1a11 11 0 005 5l1-2 5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/>
+    </svg>
+  );
+}
+function PhoneRing(){ return <span className="call-icon-wrapper"><PhoneIcon size={15} cls="call-icon"/></span>; }
+
 /* ---------- Live Calls board ---------- */
 function CallCard({ c, active, onClick, onCallback }){
   const st = STATUS[c.status]; const ident = c.name || 'Identifying…';
@@ -112,7 +128,7 @@ function CallCard({ c, active, onClick, onCallback }){
   return (
     <div onClick={onClick} className={`card p-3 mb-2 fade cursor-pointer ${active?'ring-2':''}`} style={active?{boxShadow:'0 0 0 2px var(--accent)'}:c.status==='emergency'?{borderColor:'#fca5a5'}:{}}>
       <div className="flex items-center gap-2">
-        <span className={c.status==='ringing'?'ring':liveDot?'live':''} style={{color:st.c}}>{c.status==='ringing'?'📞':'●'}</span>
+        {c.status==='ringing' ? <PhoneRing/> : <span className={liveDot?'live':''} style={{color:st.c}}>●</span>}
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium truncate">{ident}</div>
           <div className="text-xs sub truncate">{c.mrn?`MRN ${c.mrn}`:c.phone}</div>
@@ -125,7 +141,7 @@ function CallCard({ c, active, onClick, onCallback }){
       </div>
       {missed && (
         <button onClick={e=>{e.stopPropagation();onCallback(c);}} className="mt-2 w-full text-sm py-1.5 rounded-lg text-white flex items-center justify-center gap-1.5" style={{background:c.urgency==='Emergency'?'#dc2626':'#f97316'}}>
-          📞 Call back
+          <PhoneIcon size={15}/> Call back
         </button>
       )}
     </div>
@@ -383,7 +399,7 @@ function App(){
       {...L('ai','I can arrange a GP appointment to follow this up — shall I book it for you?'), status:'await-approval'},
     ]}:x));
     setSel(c.id);
-    setNotes(n=>[{ id:'cb'+c.id+Date.now(), type:'booking', read:false, callId:c.id, text:`📞 Calling back ${c.name}`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
+    setNotes(n=>[{ id:'cb'+c.id+Date.now(), type:'booking', read:false, callId:c.id, text:`Calling back ${c.name}`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
   }
   function openBell(){ setBell(o=>!o); if(!bellOpen) setNotes(n=>n.map(x=>({...x,read:true}))); }
   function pickNote(n){ setBell(false); setNav('calls'); if(n.callId) setSel(n.callId); }
