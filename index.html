@@ -278,7 +278,7 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
   function act(fn){ setRemoving(true); setTimeout(fn, 240); }   // animate out, then commit
   if(c.status==='emergency'){
     return (
-      <div className={`card hover-lift card-exit p-4 mb-3 fade ${removing?'removing':''}`} style={{borderColor:'#fca5a5'}}>
+      <div className={`card card-exit p-4 mb-3 fade ${removing?'removing':''}`} style={{borderColor:'#fca5a5'}}>
         <div className="text-sm font-semibold flex items-center gap-2" style={{color:'#b91c1c'}}><EmergencyBadgeIcon/> Emergency — {c.name}</div>
         {c.mrn && <div className="text-[11px] sub">MRN {c.mrn}</div>}
         <div className="text-xs sub mt-1">{c.symptoms}</div>
@@ -291,7 +291,7 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
     );
   }
   return (
-    <div className={`card hover-lift card-exit p-4 mb-3 fade ${removing?'removing':''}`} style={{borderColor:'#fcd34d'}}>
+    <div className={`card card-exit p-4 mb-3 fade ${removing?'removing':''}`} style={{borderColor:'#fcd34d'}}>
       <button onClick={()=>onOpen(c.id)} className="text-left w-full">
         <div className="text-sm font-semibold">Proposed: Book {c.proposed.urgency==='Routine'?'routine':c.proposed.urgency.toLowerCase()} GP slot</div>
         <div className="text-xs sub mt-0.5">{c.name}{c.mrn?` · MRN ${c.mrn}`:''}</div>
