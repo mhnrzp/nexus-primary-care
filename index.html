@@ -16,7 +16,16 @@
   .accent{ background:var(--accent); } .accent-t{ color:var(--accent); }
   button{ font-family:inherit; cursor:pointer; border:none; background:none; }
   button:focus-visible,input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
-  .nav{ color:var(--sub); border-radius:12px; transition:.12s; } .nav:hover{ background:#f4f4f5; color:var(--ink); } .nav.on{ background:var(--accent); color:#fff; }
+  .nav{ color:var(--sub); border-radius:12px; transition:.15s; } .nav:hover{ background:rgba(13,148,136,0.08); color:#0D9488; } .nav.on{ background:var(--accent); color:#fff; } .nav.on:hover{ background:#0F766E; color:#fff; }
+  button{ transition:background .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .12s ease; }
+  button:active{ transform:scale(0.98); }
+  .approve-btn:hover{ background:#0F766E; box-shadow:0 8px 18px rgba(13,148,136,0.25); transform:translateY(-1px); }
+  .ack-btn:hover{ background:#B91C1C !important; box-shadow:0 8px 18px rgba(220,38,38,0.25); transform:translateY(-1px); }
+  .edit-btn:hover{ background:#F3F4F6; border-color:#E5E7EB; color:#111827; }
+  .reject-btn:hover{ background:rgba(239,68,68,0.08); border-color:rgba(239,68,68,0.18); color:#DC2626; }
+  .listen-btn:hover{ background:#F3F4F6; color:#0D9488; }
+  .lift-btn:hover{ transform:translateY(-1px); filter:brightness(0.95); box-shadow:0 8px 18px rgba(0,0,0,0.12); }
+  .hover-lift{ transition:transform .18s ease, box-shadow .18s ease; } .hover-lift:hover{ transform:translateY(-1px); box-shadow:0 8px 22px rgba(0,0,0,0.06); }
   .card{ background:#fff; border:1px solid var(--line); border-radius:16px; }
   .row:hover{ background:var(--soft); }
   .fade{ animation:f .25s ease-out; } @keyframes f{ from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:none;} }
@@ -145,7 +154,7 @@ function CallCard({ c, active, onClick, onCallback }){
   const liveDot = !['booked','ended'].includes(c.status);
   const missed = c.urgency==='Urgent' && c.status==='ended';
   return (
-    <div onClick={onClick} className={`card p-3 mb-2 fade cursor-pointer ${active?'ring-2':''}`} style={active?{boxShadow:'0 0 0 2px var(--accent)'}:c.status==='emergency'?{borderColor:'#fca5a5'}:{}}>
+    <div onClick={onClick} className={`card hover-lift p-3 mb-2 fade cursor-pointer ${active?'ring-2':''}`} style={active?{boxShadow:'0 0 0 2px var(--accent)'}:c.status==='emergency'?{borderColor:'#fca5a5'}:{}}>
       <div className="flex items-center gap-2">
         {c.status==='ringing' ? <PhoneRing/> : c.status==='emergency' ? <span className="emergency-dot"></span> : <span className={liveDot?'live':''} style={{color:st.c}}>●</span>}
         <div className="flex-1 min-w-0">
@@ -159,7 +168,7 @@ function CallCard({ c, active, onClick, onCallback }){
         <span className="text-[11px] sub font-mono">{c.status==='ringing'?'—':mmss}</span>
       </div>
       {missed && (
-        <button onClick={e=>{e.stopPropagation();onCallback(c);}} className="mt-2 w-full text-sm py-1.5 rounded-lg text-white flex items-center justify-center gap-1.5" style={{background:c.urgency==='Emergency'?'#dc2626':'#f97316'}}>
+        <button onClick={e=>{e.stopPropagation();onCallback(c);}} className="lift-btn mt-2 w-full text-sm py-1.5 rounded-lg text-white flex items-center justify-center gap-1.5" style={{background:c.urgency==='Emergency'?'#dc2626':'#f97316'}}>
           <PhoneIcon size={15}/> Call back
         </button>
       )}
@@ -209,20 +218,20 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
   const [reason,setReason] = useState(c.proposed?c.proposed.reason:'');
   if(c.status==='emergency'){
     return (
-      <div className="card p-4 mb-3 fade" style={{borderColor:'#fca5a5'}}>
+      <div className="card hover-lift p-4 mb-3 fade" style={{borderColor:'#fca5a5'}}>
         <div className="text-sm font-semibold flex items-center gap-2" style={{color:'#b91c1c'}}><EmergencyBadgeIcon/> Emergency — {c.name}</div>
         {c.mrn && <div className="text-[11px] sub">MRN {c.mrn}</div>}
         <div className="text-xs sub mt-1">{c.symptoms}</div>
         <div className="text-xs mt-1" style={{color:'#b91c1c'}}>999 advised · no booking · duty team alerted.</div>
         <div className="flex gap-2 mt-3">
-          <button onClick={()=>onOpen(c.id)} className="text-sm px-3 py-1.5 rounded-lg border line">Listen in</button>
-          <button onClick={()=>onAck(c)} className="text-white text-sm px-3 py-1.5 rounded-lg flex-1" style={{background:'#dc2626'}}>Acknowledge</button>
+          <button onClick={()=>onOpen(c.id)} className="listen-btn text-sm px-3 py-1.5 rounded-lg border line">Listen in</button>
+          <button onClick={()=>onAck(c)} className="ack-btn text-white text-sm px-3 py-1.5 rounded-lg flex-1" style={{background:'#dc2626'}}>Acknowledge</button>
         </div>
       </div>
     );
   }
   return (
-    <div className="card p-4 mb-3 fade" style={{borderColor:'#fcd34d'}}>
+    <div className="card hover-lift p-4 mb-3 fade" style={{borderColor:'#fcd34d'}}>
       <button onClick={()=>onOpen(c.id)} className="text-left w-full">
         <div className="text-sm font-semibold">Proposed: Book {c.proposed.urgency==='Routine'?'routine':c.proposed.urgency.toLowerCase()} GP slot</div>
         <div className="text-xs sub mt-0.5">{c.name}{c.mrn?` · MRN ${c.mrn}`:''}</div>
@@ -240,9 +249,9 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
         </div>
       )}
       <div className="flex gap-2 mt-3">
-        <button onClick={()=>onApprove(c, editing?reason:null)} className="accent text-white text-sm py-2 rounded-lg flex-1">Approve</button>
-        <button onClick={()=>{ if(editing){onEdit(c,reason);setEditing(false);} else setEditing(true); }} className="border line text-sm px-3 py-2 rounded-lg">{editing?'Save':'Edit'}</button>
-        <button onClick={()=>onReject(c)} className="border line text-sm px-3 py-2 rounded-lg">Reject</button>
+        <button onClick={()=>onApprove(c, editing?reason:null)} className="approve-btn accent text-white text-sm py-2 rounded-lg flex-1">Approve</button>
+        <button onClick={()=>{ if(editing){onEdit(c,reason);setEditing(false);} else setEditing(true); }} className="edit-btn border line text-sm px-3 py-2 rounded-lg">{editing?'Save':'Edit'}</button>
+        <button onClick={()=>onReject(c)} className="reject-btn border line text-sm px-3 py-2 rounded-lg">Reject</button>
       </div>
     </div>
   );
