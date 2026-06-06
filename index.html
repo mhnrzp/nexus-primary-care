@@ -222,7 +222,7 @@ function CallDetail({ c, expanded, onToggleExpand }){
   if(!c) return <div className="card chat-anim flex items-center justify-center sub text-sm" style={{height:h}}>Select a call to listen in.</div>;
   const st = STATUS[c.status];
   return (
-    <div className="card chat-anim flex flex-col" style={{height:h, ...(expanded?{boxShadow:'0 18px 45px rgba(0,0,0,0.12)',borderRadius:24,position:'relative',zIndex:20}:{})}}>
+    <div className="card chat-anim flex flex-col" style={{height:h}}>
       <div className="px-4 py-3 border-b line flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold truncate">{c.name||'Identifying caller…'}</div>
@@ -335,7 +335,7 @@ function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onC
         {active.length>0 && <span className="text-xs font-medium px-2 py-1 rounded-full" style={{background:'var(--accent-soft)',color:'#0f766e'}}>{active.length} on the line</span>}
       </div>
       <div className="flex items-start">
-        <div className="col-anim overflow-hidden" style={{flex:'0 0 auto', width: expanded?0:'24%', marginRight: expanded?0:20, opacity: expanded?0:1}}>
+        <div style={{flex:'0 0 24%', marginRight:20}}>
           <div className="text-xs font-semibold sub uppercase tracking-wide mb-3">On the line</div>
           {calls.map(c=><CallCard key={c.id} c={c} active={sel===c.id} onClick={()=>setSel(c.id)} onCallback={onCallback}/>)}
         </div>
