@@ -85,7 +85,7 @@ const byId = id => PATIENTS.find(p=>p.id===id);
 
 const NAV = [
   ['dashboard','Dashboard', <path d="M4 5h6v6H4zM14 5h6v4h-6zM14 13h6v6h-6zM4 15h6v4H4z"/>],
-  ['patients','Patients', <path d="M16 11a4 4 0 10-8 0M3 20a7 7 0 0114 0"/>],
+  ['patients','Patients', <React.Fragment><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></React.Fragment>],
   ['appointments','Appointments', <path d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4"/>],
   ['messages','Messages', <path d="M4 5h16v12H7l-3 3z"/>],
   ['reports','Reports', <path d="M5 3h9l5 5v13H5zM14 3v5h5M8 13h8M8 17h8"/>],
