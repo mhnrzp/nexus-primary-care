@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXUS — Unified Healthcare Platform (Primary Care demo)</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --bg:#f1f5f9; --card:#ffffff; --sidebar:#ffffff; --text:#0f172a; --sub:#64748b;
+    --border:#e2e8f0; --hover:#f1f5f9; --soft:#f8fafc;
+    --nhs:#005EB6; --teal:#0891b2;
+  }
+  .dark{
+    --bg:#0b1220; --card:#111a2e; --sidebar:#0d1526; --text:#e6edf6; --sub:#94a3b8;
+    --border:#1f2c44; --hover:#16213a; --soft:#0f1828;
+  }
+  *{ box-sizing:border-box; }
+  body{ font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); margin:0; }
+  .card{ background:var(--card); border:1px solid var(--border); }
+  .bd{ border:1px solid var(--border); }
+  .bdt{ border-top:1px solid var(--border); }
+  .bdb{ border-bottom:1px solid var(--border); }
+  .text-sub{ color:var(--sub); }
+  .soft{ background:var(--soft); }
+  .hoverable{ transition:background .12s,border-color .12s; }
+  .hoverable:hover{ background:var(--hover); }
+  .nhs{ background:var(--nhs); } .nhs-t{ color:var(--nhs); }
+  .navitem{ color:var(--sub); transition:all .12s; }
+  .navitem:hover{ background:var(--hover); color:var(--text); }
+  .navitem.active{ background:rgba(0,94,182,.12); color:var(--nhs); font-weight:600; }
+  button{ font-family:inherit; cursor:pointer; }
+  button:focus-visible,a:focus-visible{ outline:2px solid var(--nhs); outline-offset:2px; }
+  ::-webkit-scrollbar{ width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:5px; }
+  .fade{ animation:fade .3s ease-out; }
+  @keyframes fade{ from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:none;} }
+  .typing span{ animation:blink 1.2s infinite; } .typing span:nth-child(2){animation-delay:.2s;} .typing span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{ 0%,60%,100%{opacity:.25;} 30%{opacity:1;} }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>tailwind.config = { corePlugins:{ preflight:false } };</script>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ============================ Shared data ============================ */
+const ROLES = ['GP','Practice Nurse','Receptionist','Practice Manager'];
+
+const URG = {
+  Routine:   { c:'bg-emerald-100 text-emerald-700', d:'Book within standard timeframe' },
+  Soon:      { c:'bg-amber-100 text-amber-700',     d:'Book within 48 hours' },
+  Urgent:    { c:'bg-orange-100 text-orange-700',   d:'Same-day appointment' },
+  Emergency: { c:'bg-red-100 text-red-700',         d:'Advise 999 / A&E — do not book' },
+};
+
+const PATIENTS = [
+  {
+    id:'mh', name:'Margaret Hughes', age:69, dob:'14/03/1957', nhs:'485 777 3456',
+    address:'12 Oak Lane, Leeds LS6 2BT', phone:'07700 900123', gp:'Dr Ellis',
+    nok:'John Hughes (son) · 07700 900456', comms:'NHS App preferred · large print',
+    consent:['Share with pharmacy ✓','SMS reminders ✓','Research contact ✗'],
+    allergies:[{drug:'Penicillin',reaction:'rash'}],
+    conditions:['Hypothyroidism','Osteoarthritis'],
+    meds:[{name:'Levothyroxine 100mcg',dose:'OD',review:'12/2026'},{name:'Paracetamol 500mg',dose:'PRN',review:'—'}],
+    labs:[
+      {test:'HbA1c',val:'41',range:'<42 mmol/mol',flag:false,date:'02/06/26'},
+      {test:'TSH',val:'5.8',range:'0.4–4.0 mU/L',flag:true,date:'02/06/26'},
+      {test:'eGFR',val:'78',range:'>60 mL/min',flag:false,date:'02/06/26'},
+      {test:'CRP',val:'12',range:'<5 mg/L',flag:true,date:'06/06/26'},
+    ],
+    symptoms:[
+      {s:'Sore throat',sys:'ENT',sev:6,onset:'3 days ago',status:'active',char:'persistent, painful swallow'},
+      {s:'Fever',sys:'General',sev:5,onset:'3 days ago',status:'active',char:'subjective, "run down"'},
+      {s:'Knee pain',sys:'MSK',sev:4,onset:'8 months ago',status:'recurring',char:'worse on stairs'},
+    ],
+  },
+  {
+    id:'do', name:'David Okafor', age:44, dob:'02/09/1981', nhs:'623 114 9087',
+    address:'4 Mill Court, Leeds LS2 9JT', phone:'07700 900789', gp:'Dr Ellis',
+    nok:'Grace Okafor (wife)', comms:'SMS preferred', consent:['SMS reminders ✓'],
+    allergies:[], conditions:['Hypertension'],
+    meds:[{name:'Amlodipine 5mg',dose:'OD',review:'09/2026'}],
+    labs:[{test:'eGFR',val:'88',range:'>60 mL/min',flag:false,date:'01/06/26'},{test:'K+',val:'4.4',range:'3.5–5.3 mmol/L',flag:false,date:'01/06/26'}],
+    symptoms:[{s:'Headache',sys:'Neuro',sev:3,onset:'2 weeks',status:'resolved',char:'mild, occipital'}],
+  },
+  {
+    id:'rp', name:'Raymond Patel', age:58, dob:'11/01/1967', nhs:'701 552 8841',
+    address:'88 Vale Rd, Leeds LS11 5AA', phone:'07700 900222', gp:'Dr Shah',
+    nok:'—', comms:'Phone preferred · Gujarati interpreter', consent:['SMS reminders ✗'],
+    allergies:[{drug:'Aspirin',reaction:'wheeze'}], conditions:['Type 2 diabetes'],
+    meds:[{name:'Metformin 1g',dose:'BD',review:'10/2026'}],
+    labs:[{test:'HbA1c',val:'69',range:'<53 mmol/mol',flag:true,date:'30/05/26'}],
+    symptoms:[{s:'Changing mole, back',sys:'Skin',sev:2,onset:'6 weeks',status:'active',char:'irregular border, growing'}],
+  },
+];
+const pById = id => PATIENTS.find(p=>p.id===id);
+
+/* Seed approval-queue items (the spine: nothing executes without sign-off) */
+const SEED_APPROVALS = [
+  { id:'a1', agent:'Call AI · after-hours', type:'Provisional booking', risk:'med', urgency:'Urgent',
+    patient:'Margaret Hughes', title:'Same-day GP appointment (provisional)',
+    proposed:'Book Dr Ellis · today 09:10 · 10-min telephone',
+    reasoning:['Symptoms: sore throat + fever 3 days','History: hypothyroid, age 69','Red-flag screen: negative (no stridor/dysphagia/swelling)','CRP 12 (raised) from recent bloods'],
+    note:'Patient NOT yet notified — awaiting GP confirmation of urgency + booking.' },
+  { id:'a2', agent:'Referral agent', type:'2WW referral', risk:'high', urgency:'Urgent',
+    patient:'Raymond Patel', title:'Suspected skin cancer — 2-week-wait dermatology',
+    proposed:'Generate e-RS 2WW referral → Leeds Teaching Hospitals Dermatology',
+    reasoning:['Symptom tracker: changing mole, irregular border, growing 6 weeks','Matches NICE NG12 suspected melanoma criteria','No prior dermatology referral on record'],
+    note:'Pre-filled referral letter ready. GP must review and sign before submission.' },
+  { id:'a3', agent:'Comms agent', type:'SMS reminder', risk:'low',
+    patient:'David Okafor', title:'Appointment reminder (SMS)',
+    proposed:'"Hi David, a reminder of your BP review with Dr Ellis tomorrow at 10:40. Reply C to confirm or call us to rebook. — Oakfield Surgery"',
+    reasoning:['Appt in <24h','Comms preference: SMS ✓','Consent: SMS reminders ✓'], note:null },
+  { id:'a4', agent:'Comms agent', type:'Recall batch', risk:'low',
+    patient:'12 patients', title:'Diabetes annual review — recall letters (batch)',
+    proposed:'Send NHS App recall to 12 patients overdue for diabetic review',
+    reasoning:['QOF diabetes register, review >12 months','Respecting 1 opt-out (excluded)'], note:null },
+  { id:'a5', agent:'Scheduling agent', type:'Clinic reschedule', risk:'med',
+    patient:'18 patients', title:'Dr Ellis off sick Thursday — reschedule plan',
+    proposed:'Move 18 appts: 6 to Dr Shah, 9 to Fri, 3 telephone today. Urgent slots preserved.',
+    reasoning:['Clinician absence flagged','Urgency bands respected — no Urgent moved to >same-day','DNA-risk patients prioritised for confirmation call'], note:null },
+  { id:'a6', agent:'Rostering agent', type:'Cover gap', risk:'med',
+    patient:'—', title:'Friday PM cover gap — duty GP',
+    proposed:'Offer Friday 14:00–18:30 duty session to Dr Shah (within WTD limits)',
+    reasoning:['Expected volume high (post-bank-holiday)','Dr Shah under contracted sessions this week','WTD rest requirements satisfied'], note:null },
+];
+
+/* ============================ Small UI atoms ============================ */
+function Badge({ urgency }){
+  const u = URG[urgency]; if(!u) return null;
+  return <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full ${u.c}`}>{urgency}</span>;
+}
+function Risk({ level }){
+  const m={low:'bg-emerald-100 text-emerald-700',med:'bg-amber-100 text-amber-700',high:'bg-red-100 text-red-700'};
+  return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${m[level]}`}>{level.toUpperCase()} RISK</span>;
+}
+function Stat({ label, value, sub, accent }){
+  return (
+    <div className="card rounded-xl p-4">
+      <div className="text-2xl font-bold" style={{color:accent||'var(--text)'}}>{value}</div>
+      <div className="text-xs text-sub mt-0.5">{label}</div>
+      {sub && <div className="text-[11px] mt-0.5" style={{color:'#059669'}}>{sub}</div>}
+    </div>
+  );
+}
+function SectionTitle({ children, right }){
+  return <div className="flex items-center justify-between mb-2"><div className="text-xs font-semibold text-sub uppercase tracking-wide">{children}</div>{right}</div>;
+}
+
+/* ============================ Sidebar ============================ */
+const NAV = [
+  { k:'dashboard', label:'Dashboard', icon:'▦' },
+  { k:'calls', label:'Call Handling', icon:'☎' },
+  { k:'urgency', label:'Urgency Engine', icon:'⚑' },
+  { k:'approvals', label:'Approval Queue', icon:'✔', badge:true },
+  { k:'patients', label:'Patients', icon:'☺' },
+  { k:'scheduling', label:'Scheduling', icon:'▤' },
+  { k:'agents', label:'AI Admin Agents', icon:'✦' },
+  { k:'audit', label:'Audit Log', icon:'≣' },
+];
+
+function Sidebar({ nav, setNav, approvalsCount }){
+  return (
+    <aside className="w-60 shrink-0 bdr bd h-screen sticky top-0 flex flex-col" style={{background:'var(--sidebar)',borderRight:'1px solid var(--border)',borderTop:'none',borderBottom:'none',borderLeft:'none'}}>
+      <div className="px-4 py-4 bdb flex items-center gap-2">
+        <div className="nhs text-white font-extrabold rounded-lg w-9 h-9 flex items-center justify-center">N</div>
+        <div>
+          <div className="font-bold leading-tight">NEXUS</div>
+          <div className="text-[10px] text-sub">Unified Healthcare Platform</div>
+        </div>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto py-3">
+        <div className="px-4 text-[10px] font-semibold text-sub uppercase tracking-wide mb-1">Primary Care</div>
+        {NAV.map(n=>(
+          <button key={n.k} onClick={()=>setNav(n.k)}
+            className={`navitem w-full flex items-center gap-3 px-4 py-2 text-sm ${nav===n.k?'active':''}`}>
+            <span className="w-4 text-center opacity-70">{n.icon}</span>
+            <span className="flex-1 text-left">{n.label}</span>
+            {n.badge && approvalsCount>0 && <span className="text-[10px] bg-amber-500 text-white px-1.5 rounded-full">{approvalsCount}</span>}
+          </button>
+        ))}
+
+        <div className="px-4 text-[10px] font-semibold text-sub uppercase tracking-wide mt-4 mb-1">Other care settings</div>
+        {[['Secondary Care','🏥'],['Tertiary Care','🩺']].map(([l,i])=>(
+          <div key={l} className="w-full flex items-center gap-3 px-4 py-2 text-sm opacity-40 cursor-not-allowed select-none">
+            <span className="w-4 text-center">{i}</span>
+            <span className="flex-1 text-left">{l}</span>
+            <span className="text-[9px] bd rounded px-1 py-0.5 text-sub">SOON</span>
+          </div>
+        ))}
+      </nav>
+
+      <div className="px-4 py-3 bdt text-[10px] text-sub leading-relaxed">
+        Demo · primary care only. No live clinical system. Every AI action requires human sign-off.
+      </div>
+    </aside>
+  );
+}
+
+/* ============================ Topbar ============================ */
+function Topbar({ role, setRole, dark, setDark, title }){
+  return (
+    <header className="card bdb rounded-none px-6 py-3 flex items-center gap-4 sticky top-0 z-10" style={{borderLeft:'none',borderRight:'none',borderTop:'none'}}>
+      <div className="font-semibold">{title}</div>
+      <div className="ml-auto flex items-center gap-3">
+        <label className="text-xs text-sub">Viewing as</label>
+        <select value={role} onChange={e=>setRole(e.target.value)}
+          className="text-sm bd rounded-lg px-2 py-1.5 card" style={{color:'var(--text)'}}>
+          {ROLES.map(r=><option key={r}>{r}</option>)}
+        </select>
+        <button onClick={()=>setDark(!dark)} className="bd rounded-lg px-2.5 py-1.5 text-sm hoverable" title="Toggle dark mode">
+          {dark?'☀':'🌙'}
+        </button>
+        <div className="w-8 h-8 rounded-full nhs text-white flex items-center justify-center text-xs font-semibold">DE</div>
+      </div>
+    </header>
+  );
+}
+
+/* ============================ Dashboard (role-aware) ============================ */
+function Dashboard({ role, approvals, go }){
+  const transcripts = approvals.filter(a=>a.agent.startsWith('Call'));
+  if(role==='Receptionist') return (
+    <div className="space-y-4 fade">
+      <div className="grid grid-cols-4 gap-3">
+        <Stat label="Calls in queue" value="3" />
+        <Stat label="Overflow → AI" value="2" sub="AI handling" accent="var(--teal)"/>
+        <Stat label="Avg wait" value="40s" sub="vs 11m before"/>
+        <Stat label="Comms to approve" value={approvals.filter(a=>a.agent.startsWith('Comms')).length}/>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="card rounded-xl p-4">
+          <SectionTitle right={<button onClick={()=>go('calls')} className="text-xs nhs-t hover:underline">Open call handling →</button>}>Live call queue</SectionTitle>
+          {[['Line 1','Mrs A. Begum · symptom logging','You'],['Line 2','Overflow · AI voice agent','AI'],['Line 3','Overflow · AI voice agent','AI']].map((c,i)=>(
+            <div key={i} className="flex items-center justify-between py-2 bdb last:border-0 text-sm">
+              <span>{c[0]} — <span className="text-sub">{c[1]}</span></span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${c[2]==='AI'?'bg-cyan-100 text-cyan-700':'bg-blue-100 text-blue-700'}`}>{c[2]}</span>
+            </div>
+          ))}
+        </div>
+        <div className="card rounded-xl p-4">
+          <SectionTitle right={<button onClick={()=>go('approvals')} className="text-xs nhs-t hover:underline">Open →</button>}>Communications awaiting approval</SectionTitle>
+          {approvals.filter(a=>a.agent.startsWith('Comms')).map(a=>(
+            <div key={a.id} className="py-2 bdb last:border-0 text-sm"><div className="font-medium">{a.title}</div><div className="text-sub text-xs">{a.patient}</div></div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+  if(role==='Practice Manager') return (
+    <div className="space-y-4 fade">
+      <div className="grid grid-cols-4 gap-3">
+        <Stat label="Clinic utilisation" value="91%" sub="+6% vs last wk"/>
+        <Stat label="DNA rate" value="3.2%" sub="−1.8% (AI reminders)"/>
+        <Stat label="Referrals this month" value="64"/>
+        <Stat label="Rota coverage" value="98%" sub="1 gap Fri PM"/>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="card rounded-xl p-4">
+          <SectionTitle>AI agent performance (7 days)</SectionTitle>
+          {[['Scheduling agent','142 actions','96% approved'],['Comms agent','318 drafts','99% approved'],['Referral agent','27 letters','89% approved, 3 edited'],['Rostering agent','11 plans','100% approved']].map((r,i)=>(
+            <div key={i} className="flex items-center justify-between py-2 bdb last:border-0 text-sm">
+              <span className="font-medium">{r[0]}</span><span className="text-sub text-xs">{r[1]}</span><span className="text-emerald-600 text-xs">{r[2]}</span>
+            </div>
+          ))}
+        </div>
+        <div className="card rounded-xl p-4">
+          <SectionTitle>Operational snapshot</SectionTitle>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            {[['Same-day demand met','88%'],['8am call abandonment','2%'],['2WW within target','100%'],['Staff hours saved/wk','~34h']].map((r,i)=>(
+              <div key={i} className="soft rounded-lg p-3"><div className="text-lg font-semibold">{r[1]}</div><div className="text-xs text-sub">{r[0]}</div></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+  // GP / Nurse
+  return (
+    <div className="space-y-4 fade">
+      <div className="grid grid-cols-4 gap-3">
+        <Stat label="Pending approvals" value={approvals.length} accent="#d97706"/>
+        <Stat label="Urgency flags" value={approvals.filter(a=>a.urgency==='Urgent'||a.urgency==='Emergency').length} accent="#ea580c"/>
+        <Stat label="Transcripts to review" value={transcripts.length}/>
+        <Stat label="Results to acknowledge" value="2" accent="#dc2626"/>
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        <div className="card rounded-xl p-4 col-span-2">
+          <SectionTitle right={<button onClick={()=>go('approvals')} className="text-xs nhs-t hover:underline">Open queue →</button>}>Approvals needing you</SectionTitle>
+          {approvals.slice(0,4).map(a=>(
+            <button key={a.id} onClick={()=>go('approvals')} className="w-full text-left flex items-center gap-3 py-2 bdb last:border-0 hoverable rounded px-1">
+              <span className="text-[10px] text-sub w-28 shrink-0">{a.agent}</span>
+              <span className="flex-1 text-sm">{a.title}<span className="text-sub"> · {a.patient}</span></span>
+              {a.urgency && <Badge urgency={a.urgency}/>}
+            </button>
+          ))}
+        </div>
+        <div className="card rounded-xl p-4">
+          <SectionTitle right={<button onClick={()=>go('scheduling')} className="text-xs nhs-t hover:underline">Clinic →</button>}>Today's clinic</SectionTitle>
+          {[['09:10','M. Hughes','Urgent'],['10:40','D. Okafor','Routine'],['11:00','R. Patel','Soon']].map((c,i)=>(
+            <div key={i} className="flex items-center gap-2 py-2 bdb last:border-0 text-sm">
+              <span className="text-sub w-12">{c[0]}</span><span className="flex-1">{c[1]}</span><Badge urgency={c[2]}/>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="card rounded-xl p-4">
+          <SectionTitle right={<button onClick={()=>go('patients')} className="text-xs nhs-t hover:underline">View →</button>}>Lab results requiring acknowledgement</SectionTitle>
+          {[['M. Hughes','CRP 12 (raised), TSH 5.8 (raised)'],['R. Patel','HbA1c 69 (raised)']].map((r,i)=>(
+            <div key={i} className="py-2 bdb last:border-0 text-sm"><span className="font-medium">{r[0]}</span><span className="text-sub"> — {r[1]}</span></div>
+          ))}
+        </div>
+        <div className="card rounded-xl p-4">
+          <SectionTitle right={<button onClick={()=>go('agents')} className="text-xs nhs-t hover:underline">Referrals →</button>}>Referral pipeline</SectionTitle>
+          {[['R. Patel','2WW dermatology','Awaiting GP sign-off'],['M. Hughes','Routine ortho (knee)','Draft']].map((r,i)=>(
+            <div key={i} className="flex items-center justify-between py-2 bdb last:border-0 text-sm"><span>{r[0]} · <span className="text-sub">{r[1]}</span></span><span className="text-[11px] text-amber-600">{r[2]}</span></div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ Call Handling ============================ */
+const CALL_SCRIPTS = {
+  busy: {
+    label:'Working hours · receptionists busy → AI overflow',
+    banner:'All receptionists are on calls. The AI voice agent answers overflow so no patient waits on hold.',
+    steps:[
+      ['ai',"Hello, you're through to Oakfield Surgery. Our receptionists are all on other calls, so I'm the practice's AI assistant — I can help you book and I'll pass everything to the team. Can I start with your name?"],
+      ['pt',"Yes, it's Margaret Hughes."],
+      ['ai',"Thank you, Margaret. And your date of birth, just to find your record?"],
+      ['pt',"14th of March 1957."],
+      ['ai',"Got it, found you. What's troubling you today?"],
+      ['pt',"I've had a really sore throat and a fever for about three days now."],
+      ['ai',"That sounds uncomfortable, I'm sorry. Just a couple of quick checks — are you having any trouble breathing or swallowing fluids, or any swelling in your face or neck?"],
+      ['pt',"No, nothing like that, just sore."],
+      ['ai',"That's reassuring. Given three days of symptoms and your history, I'd like a GP to speak with you today. I'm pencilling in a telephone appointment — a doctor will confirm it and you'll get a text. Does the morning suit?"],
+      ['pt',"Yes, the morning's fine, thank you."],
+      ['ai',"Lovely. I've noted everything down for the team. Take care, Margaret."],
+    ],
+    out:{ urgency:'Urgent', booking:'Provisional: Dr Ellis · today 09:10 telephone' }
+  },
+  after: {
+    label:'After hours · AI only',
+    banner:'Practice is closed. The AI handles all calls, reassures the patient, screens for emergencies, and books provisionally for GP review in the morning.',
+    steps:[
+      ['ai',"Hello, you've reached Oakfield Surgery. I should let you know the practice is currently closed, but I'm the AI assistant and I can still help and make sure the team sees this first thing. May I take your name?"],
+      ['pt',"It's Margaret Hughes."],
+      ['ai',"Thank you, Margaret. What's been going on?"],
+      ['pt',"My throat's been terrible and I've had a fever for three days. I got worried calling this late."],
+      ['ai',"That's completely alright — you've done the right thing. Let me just check a couple of important things: any difficulty breathing, trouble swallowing your own saliva, or swelling in the neck or face?"],
+      ['pt',"No, none of that."],
+      ['ai',"Good, that's reassuring — those would be the things needing urgent care tonight. This doesn't sound like an emergency, so rather than send you out late, I'll book you a GP call for the morning and flag it as a priority for review. If anything worsens overnight — breathing trouble or you can't swallow — please call 999. Does that sound okay?"],
+      ['pt',"Yes, that's a relief, thank you."],
+      ['ai',"You're very welcome. Try to rest. The team will see your details the moment they open. Goodnight, Margaret."],
+    ],
+    out:{ urgency:'Urgent', booking:'Provisional: GP telephone · 08:50 tomorrow (priority review)' }
+  },
+  emergency: {
+    label:'After hours · emergency detected',
+    banner:'When the urgency engine detects an emergency, the AI does NOT book — it advises 999/A&E and logs for the team.',
+    steps:[
+      ['ai',"Hello, you've reached Oakfield Surgery — we're closed, but I'm the AI assistant and I can help. Can I take your name?"],
+      ['pt',"Tom Bennett… I've got a crushing pain in my chest and down my left arm, came on twenty minutes ago, feeling sick."],
+      ['sys','⚠ URGENCY ENGINE: EMERGENCY — chest pain + radiation + acute onset. Booking suppressed.'],
+      ['ai',"Tom, thank you for telling me — this needs emergency help right now, not a GP appointment. Please call 999 immediately, or if someone can take you straight to A&E. Don't drive yourself. I'm logging this for the practice now. Stay on the line if you can while you dial 999."],
+    ],
+    out:{ urgency:'Emergency', booking:'No booking — 999/A&E advised. Logged for GP review.' }
+  },
+};
+
+function CallHandling({ role, addApproval }){
+  const [mode,setMode] = useState('busy');
+  const [shown,setShown] = useState(0);
+  const [typing,setTyping] = useState(null);
+  const [result,setResult] = useState(null);
+  const [recoSymptoms,setReco] = useState('');
+  const boxRef = useRef(null); const timers = useRef([]);
+  const sc = CALL_SCRIPTS[mode];
+
+  useEffect(()=>()=>timers.current.forEach(clearTimeout),[]);
+  useEffect(()=>{ if(boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight; },[shown,typing]);
+
+  function play(m){
+    timers.current.forEach(clearTimeout); timers.current=[];
+    setMode(m); setShown(0); setTyping(null); setResult(null);
+    const steps = CALL_SCRIPTS[m].steps; let t=300;
+    steps.forEach((st,idx)=>{
+      if(st[0]!=='sys'){ timers.current.push(setTimeout(()=>setTyping(st[0]),t)); t+= st[0]==='ai'?1100:850; }
+      timers.current.push(setTimeout(()=>{ setTyping(null); setShown(idx+1); },t)); t+=650;
+    });
+    timers.current.push(setTimeout(()=>setResult(CALL_SCRIPTS[m].out),t));
+  }
+
+  function sendToGP(){
+    const o = sc.out;
+    addApproval({
+      id:'call'+Date.now(), agent:'Call AI · '+(mode==='after'?'after-hours':mode==='emergency'?'after-hours':'overflow'),
+      type: o.urgency==='Emergency'?'Emergency log':'Provisional booking', risk: o.urgency==='Emergency'?'high':'med',
+      urgency:o.urgency, patient: mode==='emergency'?'Tom Bennett':'Margaret Hughes',
+      title: o.urgency==='Emergency'?'Emergency call — 999 advised (review)':'Provisional booking from AI call',
+      proposed:o.booking,
+      reasoning:['Captured from full call transcript','Urgency engine rating: '+o.urgency,'Red-flag screen completed in call'],
+      note:'Patient NOT notified until GP confirms.'
+    });
+    setResult({...o, sent:true});
+  }
+
+  return (
+    <div className="space-y-4 fade">
+      {/* mode tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {role==='Receptionist' &&
+          <button onClick={()=>{setMode('reception');setResult(null);}} className={`text-sm px-3 py-2 rounded-lg bd ${mode==='reception'?'nhs text-white':'card hoverable'}`}>Receptionist on call</button>}
+        {Object.entries(CALL_SCRIPTS).map(([k,v])=>(
+          <button key={k} onClick={()=>play(k)} className={`text-sm px-3 py-2 rounded-lg bd ${mode===k?'nhs text-white':'card hoverable'}`}>{v.label}</button>
+        ))}
+      </div>
+
+      {mode==='reception' ? (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="card rounded-xl p-4">
+            <SectionTitle>Receptionist — log patient symptoms</SectionTitle>
+            <div className="text-xs text-sub mb-2">Patient: Mrs A. Begum · DOB 03/05/1990</div>
+            <textarea value={recoSymptoms} onChange={e=>setReco(e.target.value)} placeholder="Type symptoms as the patient describes them… e.g. 'cough 5 days, now wheezy, mild temp'"
+              className="w-full bd rounded-lg p-3 text-sm card h-32 resize-none" style={{color:'var(--text)'}}/>
+            <button onClick={()=>setResult({urgency:'Soon',booking:'Suggested: GP within 48h'})} className="mt-2 nhs text-white text-sm px-4 py-2 rounded-lg">Run urgency engine</button>
+          </div>
+          <div className="card rounded-xl p-4">
+            <SectionTitle>Urgency result</SectionTitle>
+            {!result ? <div className="text-sm text-sub">Log symptoms and run the engine. The rating is computed from symptoms + patient history — receptionists can view it but cannot change it.</div> : (
+              <div className="fade space-y-2">
+                <div className="flex items-center gap-2"><Badge urgency={result.urgency}/><span className="text-sm text-sub">{URG[result.urgency].d}</span></div>
+                <div className="soft rounded-lg p-3 text-sm">{result.booking}</div>
+                <div className="text-xs text-amber-600">🔒 Read-only for receptionists. Sent to GP to confirm before the patient is notified.</div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-12 gap-4">
+          {/* transcript */}
+          <div className="col-span-7 card rounded-xl flex flex-col overflow-hidden">
+            <div className="px-4 py-2 bdb text-xs text-sub">{sc.banner}</div>
+            <div ref={boxRef} className="p-4 space-y-2 overflow-y-auto" style={{minHeight:380,maxHeight:440}}>
+              {sc.steps.slice(0,shown).map((st,i)=> st[0]==='sys' ? (
+                <div key={i} className="text-center text-xs bg-red-50 text-red-700 bd rounded-md py-1.5 px-3 fade" style={{borderColor:'#fecaca'}}>{st[1]}</div>
+              ) : (
+                <div key={i} className={`flex ${st[0]==='ai'?'justify-start':'justify-end'} fade`}>
+                  <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${st[0]==='ai'?'nhs text-white rounded-tl-sm':'soft bd rounded-tr-sm'}`}>
+                    {st[0]==='ai' && <div className="text-[10px] uppercase opacity-70 mb-0.5">AI voice agent</div>}{st[1]}
+                  </div>
+                </div>
+              ))}
+              {typing && <div className={`flex ${typing==='ai'?'justify-start':'justify-end'}`}><div className={`typing rounded-2xl px-3 py-2 ${typing==='ai'?'nhs text-white':'soft bd'}`}><span>●</span><span>●</span><span>●</span></div></div>}
+              {shown===0 && <div className="text-sm text-sub text-center py-12">Click a scenario above to play the call.</div>}
+            </div>
+          </div>
+          {/* outcome */}
+          <div className="col-span-5 space-y-3">
+            <div className="card rounded-xl p-4">
+              <SectionTitle>Live capture</SectionTitle>
+              <div className="text-sm space-y-1">
+                <div><span className="text-sub">Patient: </span>{mode==='emergency'?'Tom Bennett':'Margaret Hughes'}</div>
+                <div><span className="text-sub">Transcript: </span>{shown>0?'recording…':'—'} {result&&'✓ complete'}</div>
+                <div><span className="text-sub">Red-flag screen: </span>{result?(mode==='emergency'?'POSITIVE':'negative'):'pending'}</div>
+              </div>
+            </div>
+            {result && (
+              <div className="card rounded-xl p-4 fade">
+                <SectionTitle>Urgency engine output</SectionTitle>
+                <div className="flex items-center gap-2 mb-2"><Badge urgency={result.urgency}/><span className="text-xs text-sub">{URG[result.urgency].d}</span></div>
+                <div className="soft rounded-lg p-3 text-sm mb-2">{result.booking}</div>
+                {result.urgency==='Emergency'
+                  ? <div className="text-xs text-red-600 font-medium">No booking made. 999/A&E advised. Logged for GP review.</div>
+                  : result.sent
+                    ? <div className="text-xs text-emerald-600">✓ Sent to GP approval queue. Patient will be notified only after GP confirms.</div>
+                    : <button onClick={sendToGP} className="w-full nhs text-white text-sm py-2 rounded-lg">Send to GP approval queue →</button>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================ Urgency Engine ============================ */
+function UrgencyEngine({ role }){
+  const [sel,setSel] = useState('mh');
+  const cases = {
+    mh:{ name:'Margaret Hughes', urgency:'Urgent',
+      symptoms:['Sore throat — severity 6/10, 3 days','Fever — subjective, 3 days'],
+      history:['Age 69 (higher baseline risk)','Hypothyroidism (immune consideration)','CRP 12 mg/L — raised (recent bloods)','No respiratory red flags on screen'],
+      logic:'3+ days symptomatic + raised inflammatory marker + age → same-day GP review recommended.' },
+    rp:{ name:'Raymond Patel', urgency:'Urgent',
+      symptoms:['Changing mole — irregular border, growing 6 weeks'],
+      history:['Matches NICE NG12 suspected melanoma criteria','Type 2 diabetic','No prior derm referral'],
+      logic:'Suspected skin cancer features → 2-week-wait pathway (treated as Urgent band).' },
+    do:{ name:'David Okafor', urgency:'Routine',
+      symptoms:['Resolved mild headache, 2 weeks ago'],
+      history:['Hypertension, controlled','No new red flags','Here for routine BP review'],
+      logic:'No active acute symptoms → routine review within standard timeframe.' },
+  };
+  const c = cases[sel];
+  return (
+    <div className="grid grid-cols-12 gap-4 fade">
+      <div className="col-span-3 space-y-2">
+        <SectionTitle>Cases</SectionTitle>
+        {Object.entries(cases).map(([k,v])=>(
+          <button key={k} onClick={()=>setSel(k)} className={`w-full text-left card rounded-lg p-3 bd hoverable ${sel===k?'ring-2':''}`} style={sel===k?{boxShadow:'0 0 0 2px var(--nhs)'}:{}}>
+            <div className="flex items-center justify-between"><span className="text-sm font-medium">{v.name}</span><Badge urgency={v.urgency}/></div>
+          </button>
+        ))}
+      </div>
+      <div className="col-span-9 card rounded-xl p-5">
+        <div className="flex items-center gap-3 mb-4"><h2 className="text-lg font-semibold">{c.name}</h2><Badge urgency={c.urgency}/><span className="text-sm text-sub">{URG[c.urgency].d}</span></div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="text-xs font-semibold text-sub uppercase mb-2">Symptoms considered</div>
+            {c.symptoms.map((s,i)=><div key={i} className="soft rounded-lg p-2.5 text-sm mb-2">{s}</div>)}
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-sub uppercase mb-2">History factors considered</div>
+            {c.history.map((s,i)=><div key={i} className="soft rounded-lg p-2.5 text-sm mb-2">{s}</div>)}
+          </div>
+        </div>
+        <div className="mt-4 bd rounded-lg p-3 text-sm" style={{background:'rgba(8,145,178,.08)',borderColor:'rgba(8,145,178,.3)'}}>
+          <span className="font-semibold nhs-t">Why this rating: </span>{c.logic}
+        </div>
+        <div className="mt-4 flex items-center gap-3">
+          {role==='GP'
+            ? (<><button className="nhs text-white text-sm px-4 py-2 rounded-lg">Confirm urgency</button><button className="bd card hoverable text-sm px-4 py-2 rounded-lg">Override with reason</button></>)
+            : (<div className="text-xs text-amber-600">🔒 You can view this rating but only a GP can confirm or change it. Admin may move appointments only within the same urgency band.</div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ Approval Queue (the spine) ============================ */
+function ApprovalQueue({ approvals, decide, role }){
+  const [sort,setSort] = useState('urgency');
+  const [expand,setExpand] = useState({});
+  const order = {Emergency:0,Urgent:1,Soon:2,Routine:3,undefined:4};
+  const sorted = [...approvals].sort((a,b)=> sort==='urgency' ? (order[a.urgency]-order[b.urgency]) : a.agent.localeCompare(b.agent));
+  const lowRisk = approvals.filter(a=>a.risk==='low');
+
+  return (
+    <div className="space-y-3 fade">
+      <div className="flex items-center gap-3">
+        <SectionTitle>Unified approval queue — {approvals.length} pending</SectionTitle>
+        <div className="ml-auto flex items-center gap-2 text-xs">
+          <span className="text-sub">Sort</span>
+          <select value={sort} onChange={e=>setSort(e.target.value)} className="bd rounded px-2 py-1 card" style={{color:'var(--text)'}}>
+            <option value="urgency">Urgency</option><option value="agent">Agent</option>
+          </select>
+          {lowRisk.length>0 && <button onClick={()=>lowRisk.forEach(a=>decide(a,'Batch-approved'))} className="bd hoverable rounded px-3 py-1">Approve all low-risk ({lowRisk.length})</button>}
+        </div>
+      </div>
+      {approvals.length===0 && <div className="card rounded-xl p-8 text-center text-sub">Queue clear. Every AI action has been reviewed. ✓</div>}
+      {sorted.map(a=>(
+        <div key={a.id} className="card rounded-xl p-4 fade">
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] text-white px-2 py-0.5 rounded-full" style={{background:'var(--teal)'}}>{a.agent}</span>
+                <span className="text-[10px] text-sub">{a.type}</span>
+                {a.urgency && <Badge urgency={a.urgency}/>}
+                <Risk level={a.risk}/>
+              </div>
+              <div className="font-semibold mt-1.5">{a.title}</div>
+              <div className="text-sm text-sub">{a.patient}</div>
+              <div className="soft rounded-lg p-3 text-sm mt-2"><span className="text-sub text-xs">Proposed action: </span>{a.proposed}</div>
+              <button onClick={()=>setExpand(e=>({...e,[a.id]:!e[a.id]}))} className="text-xs nhs-t hover:underline mt-2">{expand[a.id]?'▴ Hide reasoning':'▾ Show reasoning & data inputs'}</button>
+              {expand[a.id] && (
+                <ul className="mt-2 space-y-1 text-xs text-sub fade">
+                  {a.reasoning.map((r,i)=><li key={i}>• {r}</li>)}
+                  {a.note && <li className="text-amber-600 mt-1">⚑ {a.note}</li>}
+                </ul>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            {role==='Receptionist' && a.risk!=='low'
+              ? <div className="text-xs text-amber-600 py-2">🔒 Clinical/medium-risk actions require a GP or manager to approve.</div>
+              : (<>
+                <button onClick={()=>decide(a,'Approved')} className="nhs text-white text-sm px-4 py-1.5 rounded-lg">Approve & execute</button>
+                <button onClick={()=>decide(a,'Edited & approved')} className="bd card hoverable text-sm px-3 py-1.5 rounded-lg">Edit</button>
+                <button onClick={()=>decide(a,'Rejected — clinically inappropriate')} className="bd card hoverable text-sm px-3 py-1.5 rounded-lg">Reject</button>
+                <button onClick={()=>decide(a,'Escalated to senior reviewer')} className="bd card hoverable text-sm px-3 py-1.5 rounded-lg">Escalate</button>
+              </>)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================ Patients / clinical modules ============================ */
+function Patients({ role }){
+  const [sel,setSel] = useState('mh');
+  const [tab,setTab] = useState('overview');
+  const p = pById(sel);
+  const tabs = ['overview','symptoms','encounter','medications','investigations','cds'];
+  return (
+    <div className="grid grid-cols-12 gap-4 fade">
+      <div className="col-span-3 space-y-2">
+        <SectionTitle>Patients</SectionTitle>
+        {PATIENTS.map(pt=>(
+          <button key={pt.id} onClick={()=>{setSel(pt.id);setTab('overview');}} className={`w-full text-left card rounded-lg p-3 bd hoverable ${sel===pt.id?'ring-2':''}`} style={sel===pt.id?{boxShadow:'0 0 0 2px var(--nhs)'}:{}}>
+            <div className="text-sm font-medium">{pt.name}</div>
+            <div className="text-xs text-sub">{pt.age}y · NHS {pt.nhs}</div>
+          </button>
+        ))}
+      </div>
+      <div className="col-span-9 space-y-3">
+        <div className="card rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div><div className="text-lg font-semibold">{p.name}</div><div className="text-xs text-sub">{p.age}y · DOB {p.dob} · NHS {p.nhs} · {p.gp}</div></div>
+            {p.allergies.length>0
+              ? <div className="bg-red-50 bd rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700" style={{borderColor:'#fecaca'}}>⚠ ALLERGY: {p.allergies.map(a=>a.drug).join(', ')}</div>
+              : <div className="soft rounded-lg px-3 py-1.5 text-xs text-sub">No known allergies</div>}
+          </div>
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {tabs.map(t=><button key={t} onClick={()=>setTab(t)} className={`text-sm px-3 py-1.5 rounded-lg capitalize ${tab===t?'nhs text-white':'card bd hoverable'}`}>{t==='cds'?'Decision support':t}</button>)}
+        </div>
+        <div className="card rounded-xl p-4">
+          {tab==='overview' && <Overview p={p}/>}
+          {tab==='symptoms' && <SymptomTracker p={p}/>}
+          {tab==='encounter' && <Encounter p={p} role={role}/>}
+          {tab==='medications' && <Medications p={p}/>}
+          {tab==='investigations' && <Investigations p={p}/>}
+          {tab==='cds' && <CDS p={p}/>}
+        </div>
+      </div>
+    </div>
+  );
+}
+function Field({l,v}){ return <div><div className="text-[11px] text-sub uppercase">{l}</div><div className="text-sm">{v}</div></div>; }
+function Overview({p}){
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4">
+        <Field l="Address" v={p.address}/><Field l="Contact" v={p.phone}/><Field l="Assigned GP" v={p.gp}/>
+        <Field l="Next of kin" v={p.nok}/><Field l="Comms preference" v={p.comms}/><Field l="Conditions" v={p.conditions.join(', ')||'—'}/>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div><div className="text-[11px] text-sub uppercase mb-1">Consent flags</div>{p.consent.map((c,i)=><div key={i} className="text-sm">{c}</div>)}</div>
+        <div>
+          <div className="text-[11px] text-sub uppercase mb-1">Record controls</div>
+          <div className="text-sm space-y-1 text-sub">
+            <div>• Carer / proxy access — scoped permissions</div>
+            <div>• Demographic change audit trail enabled</div>
+            <div>• Duplicate-patient detection: no matches</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function SymptomTracker({p}){
+  const sc={active:'bg-orange-100 text-orange-700',resolved:'bg-slate-100 text-slate-600',recurring:'bg-amber-100 text-amber-700'};
+  const redflag = p.symptoms.some(s=>s.s.toLowerCase().includes('mole'));
+  return (
+    <div className="space-y-3">
+      {redflag && <div className="bg-red-50 bd rounded-lg p-3 text-sm text-red-700" style={{borderColor:'#fecaca'}}>⚑ Red-flag detected (NICE NG12): changing mole — consider 2-week-wait dermatology referral.</div>}
+      {p.symptoms.map((s,i)=>(
+        <div key={i} className="soft rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <div className="font-medium text-sm">{s.s} <span className="text-sub font-normal">· {s.sys}</span></div>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full ${sc[s.status]}`}>{s.status}</span>
+          </div>
+          <div className="text-xs text-sub mt-1">Onset {s.onset} · {s.char}</div>
+          <div className="mt-2 flex items-center gap-2"><span className="text-[11px] text-sub w-16">Severity</span><div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden" style={{background:'var(--border)'}}><div className="h-full nhs rounded-full" style={{width:s.sev*10+'%'}}></div></div><span className="text-xs w-8 text-right">{s.sev}/10</span></div>
+        </div>
+      ))}
+      <div className="text-[11px] text-sub">Includes patient-reported data from portal / call transcript. Body system, severity (0–10 VAS), onset, character, aggravating & relieving factors captured per entry.</div>
+    </div>
+  );
+}
+function Encounter({p,role}){
+  const [scribe,setScribe]=useState('idle'); const [signed,setSigned]=useState(false);
+  const drafted = scribe==='drafted';
+  const soap = p.id==='mh' ? {
+    s:'69F. 3-day sore throat + subjective fever (from call transcript). No dysphagia/breathing difficulty/neck swelling.',
+    o: drafted?'O/E: Temp 37.9°C. Pharynx erythematous, tonsils enlarged, no exudate. No cervical lymphadenopathy. Chest clear. FeverPAIN 2.':'',
+    a: drafted?'Acute viral pharyngitis. Low bacterial likelihood. No red flags.':'',
+    pl: drafted?'Self-care + safety-net advice. No antibiotic (penicillin-allergic; not indicated). Patient leaflet via NHS App.':''
+  } : { s:'(SOAP note — '+p.name+')', o:drafted?'…':'', a:drafted?'…':'', pl:drafted?'…':'' };
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold">Encounter note (SOAP) · ICD-11 / SNOMED CT coded</div>
+        {!drafted ? <button onClick={()=>{setScribe('rec');setTimeout(()=>setScribe('drafted'),1600);}} disabled={scribe==='rec'} className={`text-xs px-3 py-1.5 rounded-lg ${scribe==='rec'?'soft text-sub':'nhs text-white'}`}>{scribe==='rec'?'● transcribing…':'🎙 AI ambient scribe'}</button>
+          : <span className="text-[11px] bg-amber-100 text-amber-700 px-2 py-1 rounded-full">Draft · pending clinician review</span>}
+      </div>
+      {[['S — Subjective',soap.s,true],['O — Objective',soap.o],['A — Assessment',soap.a],['P — Plan',soap.pl]].map(([l,v,pre],i)=>(
+        <div key={i}>
+          <div className="text-[11px] font-semibold text-sub flex gap-2">{l}{pre&&<span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 rounded-full">from transcript</span>}{drafted&&!pre&&<span className="text-[9px] bg-violet-100 text-violet-700 px-1.5 rounded-full">AI scribe</span>}</div>
+          <div className={`text-sm mt-1 rounded-lg bd px-3 py-2 ${v?'soft':''}`} style={{minHeight:'2.2rem',color:v?'var(--text)':'var(--sub)'}}>{v||'Awaiting documentation…'}</div>
+        </div>
+      ))}
+      <div className="text-[11px] text-sub">Call transcript auto-attached to encounter · one-click PDF export available.</div>
+      {drafted && !signed && role!=='Receptionist' && <button onClick={()=>setSigned(true)} className="w-full nhs text-white text-sm py-2 rounded-lg">✓ Review complete — Sign & save to record</button>}
+      {signed && <div className="text-center text-sm text-emerald-700 bg-emerald-50 rounded-lg py-2">✓ Signed · saved · coded to SNOMED CT</div>}
+    </div>
+  );
+}
+function Medications({p}){
+  const blocked = p.allergies.find(a=>a.drug==='Penicillin');
+  return (
+    <div className="space-y-3">
+      <div className="text-sm font-semibold">Current medications (dm+d coded)</div>
+      {p.meds.map((m,i)=>(
+        <div key={i} className="soft rounded-lg p-3 flex items-center justify-between text-sm">
+          <div><span className="font-medium">{m.name}</span> <span className="text-sub">· {m.dose}</span></div>
+          <div className="text-xs text-sub">review {m.review}</div>
+        </div>
+      ))}
+      <div className="text-sm font-semibold mt-2">Prescribe (NHS EPS)</div>
+      {blocked && <div className="bg-red-50 bd rounded-lg p-3 text-sm text-red-700" style={{borderColor:'#fecaca'}}>⛔ Hard-stop: Phenoxymethyl<b>penicillin</b> blocked — patient allergic to Penicillin ({blocked.reaction}). Drug-allergy contraindication.</div>}
+      <div className="soft rounded-lg p-3 text-sm text-sub">Issue / modify / cancel · drug-interaction checker · repeat management · reconciliation · full prescribing audit trail — all transmitted to pharmacy via EPS after sign-off.</div>
+    </div>
+  );
+}
+function Investigations({p}){
+  return (
+    <div className="space-y-3">
+      <div className="text-sm font-semibold">Results</div>
+      <table className="w-full text-sm">
+        <thead><tr className="text-[11px] text-sub uppercase text-left"><th className="py-1">Test</th><th>Value</th><th>Range</th><th>Date</th></tr></thead>
+        <tbody>
+          {p.labs.map((l,i)=>(
+            <tr key={i} className="bdt">
+              <td className="py-2">{l.test}</td>
+              <td className={l.flag?'text-red-600 font-semibold':''}>{l.val} {l.flag&&'⬆'}</td>
+              <td className="text-sub text-xs">{l.range}</td><td className="text-sub text-xs">{l.date}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="soft rounded-lg p-3 text-xs text-sub">Trend graphs (eGFR, HbA1c, LFTs, lipids, TFTs) · clinician ordering with clinical-indication field · critical-result GP sign-off workflow · DICOM imaging viewer · results feed the urgency engine.</div>
+      {p.labs.some(l=>l.flag) && <button className="nhs text-white text-sm px-4 py-2 rounded-lg">Acknowledge abnormal results</button>}
+    </div>
+  );
+}
+function CDS({p}){
+  const scores = p.id==='do'?[['QRISK3','14.2%','10-yr CVD']]:p.id==='mh'?[['CHA₂DS₂-VASc','2','—'],['NEWS2','1','low']]:[['QRISK3','—','—']];
+  return (
+    <div className="space-y-3">
+      <div className="bg-amber-50 bd rounded-lg p-3 text-sm" style={{borderColor:'#fde68a'}}>
+        <span className="font-semibold text-amber-700">⚑ Guideline alerts: </span>
+        {p.id==='mh'?'NICE NG84 — FeverPAIN before antibiotics. BNF: penicillin contraindicated (allergy).':p.id==='do'?'NICE NG136 — BP above target, consider up-titration; check U&Es.':'NICE NG12 — suspected melanoma, 2WW pathway.'}
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {scores.map((s,i)=><div key={i} className="soft rounded-lg p-3 text-center"><div className="text-lg font-semibold">{s[1]}</div><div className="text-xs text-sub">{s[0]}</div><div className="text-[10px] text-sub">{s[2]}</div></div>)}
+      </div>
+      <div className="soft rounded-lg p-3 text-xs text-sub">Decision support is advisory only — <b>no differential diagnosis is generated</b>. Includes preventive-care & chronic-disease review reminders, drug-allergy and drug-disease contraindication alerts. The clinician decides; nothing is actioned without sign-off.</div>
+    </div>
+  );
+}
+
+/* ============================ Scheduling ============================ */
+function Scheduling({ role }){
+  const slots = [
+    ['08:50','M. Hughes','Urgent','Telephone'],['09:10','— (urgent reserve)','Urgent','Held'],
+    ['09:30','S. Cole','Routine','F2F'],['10:00','— available','','Open'],
+    ['10:40','D. Okafor','Routine','F2F'],['11:00','R. Patel','Soon','F2F · 2WW'],
+    ['11:20','— available','','Open'],
+  ];
+  return (
+    <div className="space-y-4 fade">
+      <div className="grid grid-cols-4 gap-3">
+        <Stat label="Today's slots" value="24" /><Stat label="Urgent reserved" value="4" /><Stat label="High DNA-risk" value="2" sub="reminder queued"/><Stat label="2WW routed" value="1"/>
+      </div>
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-8 card rounded-xl p-4">
+          <SectionTitle>Today — Dr Ellis</SectionTitle>
+          {slots.map((s,i)=>(
+            <div key={i} className="flex items-center gap-3 py-2 bdb last:border-0 text-sm">
+              <span className="text-sub w-12">{s[0]}</span>
+              <span className="flex-1">{s[1]}</span>
+              {s[2] && <Badge urgency={s[2]}/>}
+              <span className="text-[11px] text-sub w-20 text-right">{s[3]}</span>
+              {role!=='Receptionist' && s[1].includes('available') && <button className="text-xs nhs-t hover:underline">book</button>}
+            </div>
+          ))}
+        </div>
+        <div className="col-span-4 space-y-3">
+          <div className="card rounded-xl p-4">
+            <SectionTitle>Scheduling agent</SectionTitle>
+            <div className="text-sm text-sub space-y-1.5">
+              <div>• Waiting list re-ranked by deterioration, cancellations & DNA history</div>
+              <div>• Urgent & 2WW routed to dedicated slots</div>
+              <div>• High-DNA appointments flagged for reminder</div>
+            </div>
+            <div className="mt-2 text-[11px] text-amber-600">🔒 Admin can move appointments only within the same urgency band. Reschedule plans go to the approval queue.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ AI Agents ============================ */
+function Agents({ approvals, go }){
+  const defs = [
+    ['Scheduling agent','▤','Matches urgency to slots, re-ranks waiting lists, builds reschedule plans on clinician absence, flags DNA risk, routes 2WW. Never overrides urgency bands.'],
+    ['Communications agent','✉','Drafts reminders, visit summaries, recall & screening letters across SMS / email / NHS App. Warm, human tone. Respects consent & opt-outs. All outbound held in draft for approval.'],
+    ['Referral agent','➦','Spots referral indicators, recommends to GP, pre-fills structured e-RS letters, suggests specialty/site, tracks RTT clock & breach, extracts findings from outcome letters.'],
+    ['Rostering agent','🗓','Builds rotas from expected volume & skill mix, tracks leave & sickness, surfaces cover gaps, checks WTD & contract sessions, handles shift swaps. Changes go to manager approval.'],
+  ];
+  return (
+    <div className="space-y-4 fade">
+      <div className="card rounded-xl p-4" style={{background:'rgba(8,145,178,.08)',borderColor:'rgba(8,145,178,.3)'}}>
+        <div className="text-sm"><b className="nhs-t">Global rule:</b> every consequential AI action enters the <button onClick={()=>go('approvals')} className="nhs-t underline">unified approval queue</button> for human sign-off before execution. Agents draft and recommend — humans decide.</div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        {defs.map(([name,icon,desc])=>{
+          const mine = approvals.filter(a=>a.agent.toLowerCase().includes(name.split(' ')[0].toLowerCase()));
+          return (
+            <div key={name} className="card rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-1"><span className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{background:'var(--teal)'}}>{icon}</span><span className="font-semibold">{name}</span>
+                {mine.length>0 && <span className="ml-auto text-[11px] bg-amber-500 text-white px-2 py-0.5 rounded-full">{mine.length} pending</span>}</div>
+              <div className="text-sm text-sub leading-snug">{desc}</div>
+              {mine.length>0 && <button onClick={()=>go('approvals')} className="mt-2 text-xs nhs-t hover:underline">Review {mine.length} proposed action{mine.length>1?'s':''} →</button>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ============================ Audit ============================ */
+function Audit({ log }){
+  return (
+    <div className="space-y-3 fade">
+      <SectionTitle>Immutable audit log</SectionTitle>
+      <div className="card rounded-xl divide-y" style={{borderColor:'var(--border)'}}>
+        {log.length===0 && <div className="p-6 text-sm text-sub text-center">No actions recorded yet. Approve or reject items in the queue to populate the audit trail.</div>}
+        {log.map((e,i)=>(
+          <div key={i} className="p-3 text-sm flex items-center gap-3 bdb last:border-0">
+            <span className="text-xs text-sub w-16">{e.time}</span>
+            <span className="text-[10px] text-white px-2 py-0.5 rounded-full" style={{background:'var(--teal)'}}>{e.agent}</span>
+            <span className="flex-1">{e.title} <span className="text-sub">· {e.patient}</span></span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full ${e.verdict.startsWith('Rejected')?'bg-red-100 text-red-600':e.verdict.startsWith('Escalated')?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700'}`}>{e.verdict}</span>
+            <span className="text-xs text-sub">by {e.by}</span>
+          </div>
+        ))}
+      </div>
+      <div className="text-[11px] text-sub">Tamper-evident · records every approval, edit, rejection and escalation with actor, timestamp and reason code.</div>
+    </div>
+  );
+}
+
+/* ============================ App ============================ */
+function App(){
+  const [dark,setDark] = useState(false);
+  const [role,setRole] = useState('GP');
+  const [nav,setNav] = useState('dashboard');
+  const [approvals,setApprovals] = useState(SEED_APPROVALS);
+  const [log,setLog] = useState([]);
+
+  useEffect(()=>{ document.body.classList.toggle('dark',dark); },[dark]);
+
+  function decide(item,verdict){
+    setApprovals(a=>a.filter(x=>x.id!==item.id));
+    setLog(l=>[{ time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), agent:item.agent, title:item.title, patient:item.patient, verdict, by:role },...l]);
+  }
+  function addApproval(item){ setApprovals(a=>[item,...a]); }
+
+  const titles = {dashboard:role+' dashboard',calls:'Call handling',urgency:'Urgency engine',approvals:'Approval queue',patients:'Patients & clinical record',scheduling:'Scheduling',agents:'AI admin agents',audit:'Audit log'};
+
+  return (
+    <div className="flex">
+      <Sidebar nav={nav} setNav={setNav} approvalsCount={approvals.length}/>
+      <div className="flex-1 min-w-0">
+        <Topbar role={role} setRole={setRole} dark={dark} setDark={setDark} title={titles[nav]}/>
+        <main className="p-6">
+          {nav==='dashboard' && <Dashboard role={role} approvals={approvals} go={setNav}/>}
+          {nav==='calls' && <CallHandling role={role} addApproval={addApproval}/>}
+          {nav==='urgency' && <UrgencyEngine role={role}/>}
+          {nav==='approvals' && <ApprovalQueue approvals={approvals} decide={decide} role={role}/>}
+          {nav==='patients' && <Patients role={role}/>}
+          {nav==='scheduling' && <Scheduling role={role}/>}
+          {nav==='agents' && <Agents approvals={approvals} go={setNav}/>}
+          {nav==='audit' && <Audit log={log}/>}
+        </main>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

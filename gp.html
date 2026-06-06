@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXUS — GP</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{ --accent:#0d9488; --accent-soft:#ccfbf1; --ink:#111827; --sub:#6b7280; --line:#ececec; --bg:#ffffff; --soft:#fafafa; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Inter','Segoe UI',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  .sub{ color:var(--sub); }
+  .line{ border-color:var(--line); }
+  .soft{ background:var(--soft); }
+  .accent{ background:var(--accent); } .accent-t{ color:var(--accent); }
+  button{ font-family:inherit; cursor:pointer; border:none; background:none; }
+  button:focus-visible,input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .nav{ color:var(--sub); border-radius:12px; transition:.12s; }
+  .nav:hover{ background:#f4f4f5; color:var(--ink); }
+  .nav.on{ background:var(--accent); color:#fff; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:16px; }
+  .row:hover{ background:var(--soft); }
+  input{ font-family:inherit; }
+  .fade{ animation:f .25s ease-out; } @keyframes f{ from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:none;} }
+  ::-webkit-scrollbar{ width:8px; } ::-webkit-scrollbar-thumb{ background:#e4e4e7; border-radius:4px; }
+  textarea{ font-family:inherit; resize:none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>tailwind.config={corePlugins:{preflight:false}};</script>
+<script type="text/babel">
+const { useState, useMemo, useRef, useEffect } = React;
+
+const DOTS = { Urgent:'#f97316', Soon:'#f59e0b', Routine:'#10b981' };
+
+const PATIENTS = [
+  { id:'mh', name:'Margaret Hughes', sex:'Female', age:69, dob:'14 Mar 1957', nhs:'485 777 3456', gp:'Dr Ellis',
+    reason:'Sore throat + fever (3d)', urgency:'Urgent', time:'09:10', draft:true,
+    allergies:[{drug:'Penicillin',reaction:'rash, 2009'}],
+    problems:[{name:'Hypothyroidism',since:'2014',status:'Active'},{name:'Osteoarthritis (R knee)',since:'2019',status:'Active'}],
+    meds:[{name:'Levothyroxine 100mcg tablets',dose:'1 OD',since:'2014',review:'12/2026'},{name:'Paracetamol 500mg tablets',dose:'2 QDS PRN',since:'2021',review:'—'}],
+    history:[{date:'2022',event:'Cataract surgery — right eye'},{date:'2019',event:'Diagnosed knee osteoarthritis'},{date:'2014',event:'Diagnosed hypothyroidism'},{date:'1998',event:'Appendicectomy'}],
+    results:[{date:'02 Jun 26',test:'TSH',val:'5.8',range:'0.4–4.0 mU/L',flag:true},{date:'02 Jun 26',test:'CRP',val:'12',range:'<5 mg/L',flag:true},{date:'02 Jun 26',test:'eGFR',val:'78',range:'>60 mL/min',flag:false},{date:'02 Jun 26',test:'HbA1c',val:'41',range:'<42 mmol/mol',flag:false}],
+    orders:[{date:'02 Jun 26',item:'FBC + CRP',status:'Resulted'},{date:'02 Jun 26',item:'Thyroid function',status:'Resulted'}],
+    documents:[{date:'21 May 26',title:'Discharge summary — ENT clinic',type:'Letter'},{date:'10 Mar 26',title:'Right knee X-ray report',type:'Imaging'},{date:'02 Jan 26',title:'Annual review summary',type:'Summary'}],
+    encounters:[{date:'21 May 26',type:'Telephone',clinician:'Dr Ellis',summary:'Sore throat — self-care advised, safety-netted'},{date:'10 Mar 26',type:'Face-to-face',clinician:'Dr Shah',summary:'Knee pain review, analgesia continued'},{date:'02 Jan 26',type:'Face-to-face',clinician:'Dr Ellis',summary:'Annual hypothyroid review, dose unchanged'}] },
+  { id:'do', name:'David Okafor', sex:'Male', age:44, dob:'02 Sep 1981', nhs:'623 114 9087', gp:'Dr Ellis',
+    reason:'BP review', urgency:'Routine', time:'10:40', draft:false,
+    allergies:[], problems:[{name:'Hypertension',since:'2021',status:'Active'}],
+    meds:[{name:'Amlodipine 5mg tablets',dose:'1 OD',since:'2021',review:'09/2026'}],
+    history:[{date:'2021',event:'Diagnosed essential hypertension'}],
+    results:[{date:'01 Jun 26',test:'eGFR',val:'88',range:'>60 mL/min',flag:false},{date:'01 Jun 26',test:'K+',val:'4.4',range:'3.5–5.3 mmol/L',flag:false}],
+    orders:[{date:'01 Jun 26',item:'U&Es',status:'Resulted'}],
+    documents:[{date:'15 May 26',title:'BP monitoring chart',type:'Summary'}],
+    encounters:[{date:'15 May 26',type:'Telephone',clinician:'Dr Ellis',summary:'BP slightly high, repeat in 4 weeks'}] },
+  { id:'rp', name:'Raymond Patel', sex:'Male', age:58, dob:'11 Jan 1967', nhs:'701 552 8841', gp:'Dr Shah',
+    reason:'Changing mole', urgency:'Soon', time:'11:00', draft:false,
+    allergies:[{drug:'Aspirin',reaction:'wheeze'}], problems:[{name:'Type 2 diabetes',since:'2018',status:'Active'}],
+    meds:[{name:'Metformin 1g tablets',dose:'1 BD',since:'2018',review:'10/2026'}],
+    history:[{date:'2018',event:'Diagnosed type 2 diabetes'}],
+    results:[{date:'30 May 26',test:'HbA1c',val:'69',range:'<53 mmol/mol',flag:true}],
+    orders:[], documents:[],
+    encounters:[{date:'30 May 26',type:'Face-to-face',clinician:'Dr Shah',summary:'Diabetes review, HbA1c raised'}] },
+  { id:'sc', name:'Sarah Cole', sex:'Female', age:33, dob:'20 Jul 1992', nhs:'552 220 1144', gp:'Dr Ellis',
+    reason:'Contraception review', urgency:'Routine', time:'11:30', draft:false,
+    allergies:[], problems:[], meds:[{name:'Combined oral contraceptive',dose:'1 OD',since:'2020',review:'07/2026'}],
+    history:[], results:[], orders:[], documents:[], encounters:[] },
+  { id:'jp', name:'James Patterson', sex:'Male', age:71, dob:'05 Feb 1955', nhs:'410 880 2299', gp:'Dr Ellis',
+    reason:'Knee follow-up', urgency:'Routine', time:'12:00', draft:false,
+    allergies:[], problems:[{name:'Osteoarthritis (both knees)',since:'2016',status:'Active'}],
+    meds:[{name:'Naproxen 250mg tablets',dose:'1 BD PRN',since:'2020',review:'08/2026'}],
+    history:[{date:'2016',event:'Bilateral knee OA'}], results:[], orders:[{date:'20 May 26',item:'Knee X-ray (R)',status:'Awaiting'}],
+    documents:[], encounters:[{date:'20 May 26',type:'Face-to-face',clinician:'Dr Ellis',summary:'Knee pain, X-ray requested'}] },
+];
+const byId = id => PATIENTS.find(p=>p.id===id);
+
+const NAV = [
+  ['dashboard','Dashboard', <path d="M4 5h6v6H4zM14 5h6v4h-6zM14 13h6v6h-6zM4 15h6v4H4z"/>],
+  ['patients','Patients', <path d="M16 11a4 4 0 10-8 0M3 20a7 7 0 0114 0"/>],
+  ['appointments','Appointments', <path d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4"/>],
+  ['messages','Messages', <path d="M4 5h16v12H7l-3 3z"/>],
+  ['reports','Reports', <path d="M5 3h9l5 5v13H5zM14 3v5h5M8 13h8M8 17h8"/>],
+  ['admin','Admin', <path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/>],
+];
+
+function Icon({ d }){ return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{d}</svg>; }
+function Dot({ u }){ return <span style={{background:DOTS[u]}} className="inline-block w-2 h-2 rounded-full"></span>; }
+
+/* ---------- Sidebar ---------- */
+function Sidebar({ nav, go }){
+  return (
+    <aside className="w-60 shrink-0 h-screen sticky top-0 px-3 py-5 border-r line bg-white flex flex-col">
+      <div className="flex items-center gap-2 px-3 mb-7">
+        <div className="accent text-white font-bold rounded-xl w-8 h-8 flex items-center justify-center text-sm">N</div>
+        <span className="font-semibold tracking-tight">NEXUS</span>
+      </div>
+      <div className="px-3 text-[11px] font-medium sub tracking-widest mb-2">PRIMARY CARE · GP</div>
+      <nav className="space-y-1">
+        {NAV.map(([k,label,d])=>(
+          <button key={k} onClick={()=>go(k)} className={`nav w-full flex items-center gap-3 px-3 py-2.5 text-sm ${nav===k?'on':''}`}>
+            <Icon d={d}/><span>{label}</span>
+          </button>
+        ))}
+      </nav>
+      <div className="mt-auto px-3 flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full accent text-white flex items-center justify-center text-xs font-semibold">DE</div>
+        <div className="text-xs"><div className="font-medium">Dr Ellis</div><div className="sub">Oakfield Surgery</div></div>
+      </div>
+    </aside>
+  );
+}
+
+/* ---------- Dashboard ---------- */
+function Dashboard({ open }){
+  const [q,setQ] = useState('');
+  const results = useMemo(()=>{
+    if(!q.trim()) return [];
+    const s = q.toLowerCase();
+    return PATIENTS.filter(p=>p.name.toLowerCase().includes(s)||p.nhs.replace(/ /g,'').includes(s.replace(/ /g,''))||p.dob.toLowerCase().includes(s));
+  },[q]);
+  const drafts = PATIENTS.filter(p=>p.draft);
+
+  return (
+    <div className="max-w-6xl mx-auto fade">
+      <h1 className="text-2xl font-semibold tracking-tight mb-1">Good morning, Dr Ellis</h1>
+      <p className="sub mb-6 text-sm">Tuesday 6 June · 5 patients booked today</p>
+
+      {/* split 50 / 50 */}
+      <div className="grid grid-cols-2 gap-5">
+        {/* search */}
+        <section className="card p-5">
+          <div className="text-sm font-medium mb-3">Find a patient</div>
+          <div className="relative">
+            <svg className="absolute left-3 top-3 sub" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+            <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Name, NHS number or date of birth"
+              className="w-full pl-10 pr-3 py-3 rounded-xl soft border line text-sm" style={{background:'var(--soft)'}}/>
+          </div>
+          <div className="mt-3 min-h-[180px]">
+            {q.trim()==='' && (
+              <div className="text-sm sub py-10 text-center">
+                Start typing to search the record.
+                <div className="mt-3"><button className="accent-t text-sm font-medium">+ Register a new patient</button></div>
+              </div>
+            )}
+            {q.trim()!=='' && results.length===0 && <div className="text-sm sub py-10 text-center">No match. <button className="accent-t font-medium">+ Register “{q}”</button></div>}
+            {results.map(p=>(
+              <button key={p.id} onClick={()=>open(p.id)} className="row w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left fade">
+                <div className="w-9 h-9 rounded-full soft flex items-center justify-center text-xs font-semibold sub" style={{background:'var(--soft)'}}>{p.name.split(' ').map(n=>n[0]).join('')}</div>
+                <div className="flex-1"><div className="text-sm font-medium">{p.name}</div><div className="text-xs sub">{p.age}y · {p.dob} · NHS {p.nhs}</div></div>
+                <span className="text-xs sub">Open →</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* today's clinic */}
+        <section className="card p-5">
+          <div className="flex items-center justify-between mb-3"><span className="text-sm font-medium">Today’s clinic</span><span className="text-xs sub">5 patients</span></div>
+          <div className="space-y-1">
+            {PATIENTS.map(p=>(
+              <button key={p.id} onClick={()=>open(p.id)} className="row w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left">
+                <span className="text-xs sub w-12 tabular-nums">{p.time}</span>
+                <Dot u={p.urgency}/>
+                <div className="flex-1"><span className="text-sm font-medium">{p.name}</span><span className="text-xs sub"> · {p.reason}</span></div>
+                {p.draft && <span className="text-[10px] accent-t font-medium">draft</span>}
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      {/* lower row */}
+      <div className="grid grid-cols-2 gap-5 mt-5">
+        <section className="card p-5">
+          <div className="text-sm font-medium mb-3">Needs your attention</div>
+          {[['Lab result','Margaret Hughes — CRP raised','#ef4444'],['Lab result','Raymond Patel — HbA1c raised','#ef4444'],['AI call transcript','Overnight call — review & confirm urgency','#f59e0b'],['Copilot order','David Okafor — U&Es draft to sign','#0d9488']].map((r,i)=>(
+            <div key={i} className="flex items-center gap-3 py-2.5 border-b line last:border-0">
+              <span className="w-1.5 h-1.5 rounded-full" style={{background:r[2]}}></span>
+              <span className="text-xs sub w-28">{r[0]}</span>
+              <span className="text-sm flex-1">{r[1]}</span>
+              <button className="text-xs accent-t font-medium">Review</button>
+            </div>
+          ))}
+        </section>
+        <section className="card p-5">
+          <div className="text-sm font-medium mb-3">Continue where you left off</div>
+          {drafts.length===0 && <div className="text-sm sub py-6 text-center">No drafts in progress.</div>}
+          {drafts.map(p=>(
+            <button key={p.id} onClick={()=>open(p.id)} className="row w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left">
+              <div className="w-9 h-9 rounded-full soft flex items-center justify-center text-xs font-semibold sub" style={{background:'var(--soft)'}}>{p.name.split(' ').map(n=>n[0]).join('')}</div>
+              <div className="flex-1"><div className="text-sm font-medium">{p.name}</div><div className="text-xs sub">Encounter note started · not signed</div></div>
+              <span className="text-xs accent-t font-medium">Resume →</span>
+            </button>
+          ))}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Patient / encounter ---------- */
+const COPILOT = {
+  mh:[ {t:'Bloods: FBC + CRP', why:'Fever 3d + raised CRP — assess infection'}, {t:'Throat swab', why:'If FeverPAIN ≥4 to guide antibiotics'} ],
+  do:[ {t:'Bloods: U&Es', why:'Before antihypertensive up-titration'}, {t:'Bloods: HbA1c + lipids', why:'Annual CVD review due'} ],
+  rp:[ {t:'2WW dermatology referral', why:'Changing mole — NICE NG12 melanoma criteria'}, {t:'Bloods: HbA1c', why:'Diabetes control check'} ],
+  sc:[], jp:[ {t:'X-ray: right knee', why:'Persistent knee pain, ?OA progression'} ],
+};
+
+/* ---------- Patients list ---------- */
+function PatientsList({ open }){
+  const [q,setQ] = useState('');
+  const list = PATIENTS.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.nhs.replace(/ /g,'').includes(q.replace(/ /g,'')));
+  return (
+    <div className="max-w-6xl mx-auto fade">
+      <h1 className="text-2xl font-semibold tracking-tight mb-4">Patients</h1>
+      <div className="relative mb-4 max-w-md">
+        <svg className="absolute left-3 top-3 sub" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search name or NHS number" className="w-full pl-10 pr-3 py-2.5 rounded-xl soft border line text-sm" style={{background:'var(--soft)'}}/>
+      </div>
+      <div className="card overflow-hidden">
+        <div className="grid grid-cols-12 px-4 py-2.5 text-[11px] font-semibold sub uppercase border-b line">
+          <div className="col-span-4">Patient</div><div className="col-span-3">NHS number</div><div className="col-span-2">Usual GP</div><div className="col-span-2">Problems</div><div className="col-span-1"></div>
+        </div>
+        {list.map(p=>(
+          <button key={p.id} onClick={()=>open(p.id)} className="row w-full grid grid-cols-12 items-center px-4 py-3 text-left text-sm border-b line last:border-0">
+            <div className="col-span-4 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full soft flex items-center justify-center text-xs font-semibold sub" style={{background:'var(--soft)'}}>{p.name.split(' ').map(n=>n[0]).join('')}</div>
+              <div><div className="font-medium">{p.name}</div><div className="text-xs sub">{p.age}y · {p.sex}</div></div>
+            </div>
+            <div className="col-span-3 font-mono text-xs sub">{p.nhs}</div>
+            <div className="col-span-2 sub">{p.gp}</div>
+            <div className="col-span-2 sub">{p.problems.length||'—'}</div>
+            <div className="col-span-1 text-right accent-t text-xs">Open →</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Clinical Encounter flow ---------- */
+const ENC_STEPS = [
+  ['chief','Chief Complaint'],['hpi','Symptoms (HPI)'],['ros','Review of Systems'],
+  ['exam','Examination'],['assessment','Assessment'],['plan','Plan'],
+  ['orders','Orders / Prescriptions'],['followup','Results & Follow-up'],
+];
+function Encounter({ p, onClose, onComplete }){
+  const [f,setF] = useState({
+    chief: p.id==='mh'?'Sore throat and fever, 3 days':'',
+    hpi: p.id==='mh'?'3-day history of sore throat and subjective fever, feeling run down. No cough. No dysphagia or breathing difficulty (screened at triage).':'',
+    ros:'', exam:'', assessment:'', plan:''
+  });
+  const [scribe,setScribe] = useState('idle');
+  const [sug,setSug] = useState((COPILOT[p.id]||[]).map(o=>({...o})));
+  const [adding,setAdding] = useState(false);
+  const [draft,setDraft] = useState({ t:'', why:'' });
+  const [follow,setFollow] = useState({ when:'2 weeks', note:'Return sooner if unable to swallow fluids, difficulty breathing, or symptoms worsen.' });
+  const [done,setDone] = useState(false);
+  const [active,setActive] = useState('chief');
+  const refs = useRef({});
+
+  function signOrder(i){ setSug(list=>list.map((o,j)=>j===i?{...o,done:true}:o)); }
+  function dismissOrder(i){ setSug(list=>list.filter((_,j)=>j!==i)); }
+  function addOrder(){ if(!draft.t.trim()) return; setSug(list=>[...list,{t:draft.t.trim(),why:draft.why.trim()||'Added by clinician'}]); setDraft({t:'',why:''}); setAdding(false); }
+
+  function go(k){ setActive(k); refs.current[k]?.scrollIntoView({behavior:'smooth',block:'start'}); }
+  function set(k,v){ setF(s=>({...s,[k]:v})); }
+  function runScribe(){
+    setScribe('rec');
+    setTimeout(()=>{ setScribe('done');
+      if(p.id==='mh') setF(s=>({...s,
+        ros:'General: febrile, fatigued. ENT: sore throat. Resp: no SOB/cough. CVS: nil. Otherwise negative.',
+        exam:'Temp 37.9°C. Pharynx erythematous, tonsils enlarged, no exudate. No cervical lymphadenopathy. Chest clear. FeverPAIN 2.',
+        assessment:'Acute viral pharyngitis. Low bacterial likelihood (FeverPAIN 2). No red flags.',
+        plan:'Self-care: fluids, paracetamol. No antibiotic (penicillin-allergic; not indicated). Safety-net advice given. Patient leaflet via NHS App.' }));
+      else setF(s=>({...s, exam:'O/E findings dictated…', assessment:'Working assessment…', plan:'Management plan…' }));
+    },1500);
+  }
+
+  const fieldOf = { chief:f.chief,hpi:f.hpi,ros:f.ros,exam:f.exam,assessment:f.assessment,plan:f.plan };
+
+  return (
+    <div className="grid grid-cols-12 gap-5 fade">
+      {/* stepper */}
+      <aside className="col-span-3">
+        <div className="sticky top-6">
+          <button onClick={onClose} className="text-sm sub mb-4 flex items-center gap-1">← Back to record</button>
+          <div className="card p-2">
+            {ENC_STEPS.map(([k,label],i)=>(
+              <button key={k} onClick={()=>go(k)} className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${active===k?'':'sub'}`} style={active===k?{background:'var(--accent-soft)',color:'#0f766e',fontWeight:600}:{}}>
+                <span className="w-5 h-5 rounded-full text-[11px] flex items-center justify-center" style={{background:active===k?'var(--accent)':'var(--soft)',color:active===k?'#fff':'var(--sub)'}}>{i+1}</span>{label}
+              </button>
+            ))}
+          </div>
+          {!done
+            ? <button onClick={()=>{setDone(true);onComplete&&onComplete();}} className="w-full accent text-white text-sm py-2.5 rounded-xl mt-3">Sign &amp; complete encounter</button>
+            : <div className="text-center text-sm py-2.5 rounded-xl mt-3" style={{background:'#ecfdf5',color:'#059669'}}>✓ Encounter signed</div>}
+        </div>
+      </aside>
+
+      {/* sections */}
+      <div className="col-span-9 space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold tracking-tight">Clinical encounter · {p.name}</h1>
+          {scribe!=='done'
+            ? <button onClick={runScribe} disabled={scribe==='rec'} className={`text-xs px-3 py-1.5 rounded-lg ${scribe==='rec'?'soft sub':'accent text-white'}`} style={scribe==='rec'?{background:'var(--soft)'}:{}}>{scribe==='rec'?'● listening…':'🎙 AI scribe'}</button>
+            : <span className="text-[11px] px-2 py-1 rounded-full" style={{background:'#fef9c3',color:'#a16207'}}>AI draft · review before signing</span>}
+        </div>
+
+        {ENC_STEPS.slice(0,6).map(([k,label])=>(
+          <section key={k} ref={el=>refs.current[k]=el} className="card p-5">
+            <div className="text-sm font-medium mb-2">{label}</div>
+            <textarea value={fieldOf[k]} onChange={e=>set(k,e.target.value)} rows={k==='chief'?1:3}
+              placeholder={`Document ${label.toLowerCase()}… (type or use AI scribe)`} className="w-full px-3 py-2 rounded-xl border line text-sm soft" style={{background:'var(--soft)'}}/>
+            {k==='ros' && <button onClick={()=>set('ros','All systems reviewed — otherwise negative.')} className="text-xs accent-t mt-2">Mark all systems negative</button>}
+          </section>
+        ))}
+
+        {/* orders */}
+        <section ref={el=>refs.current.orders=el} className="card p-5">
+          <div className="flex items-center gap-2 mb-1"><span className="accent-t">✦</span><span className="text-sm font-medium">Orders / Prescriptions</span></div>
+          <p className="text-xs sub mb-3">Copilot drafts investigations & prescriptions from this encounter — you confirm before anything is ordered.</p>
+          {sug.length===0 && !adding && <div className="text-sm sub py-4 text-center">No orders yet.</div>}
+          {sug.map((o,i)=>(
+            <div key={i} className="border line rounded-xl p-3 mb-2 flex items-start gap-3">
+              <div className="flex-1"><div className="text-sm font-medium">{o.t}</div><div className="text-xs sub mt-0.5">{o.why}</div></div>
+              {o.done
+                ? <span className="text-xs" style={{color:'#059669'}}>✓ Ordered · sent to {o.t.toLowerCase().includes('referral')?'e-RS':o.t.toLowerCase().includes('x-ray')||o.t.toLowerCase().includes('imag')?'imaging':o.t.toLowerCase().includes('swab')?'microbiology':'pathology'}</span>
+                : <div className="flex gap-2"><button onClick={()=>signOrder(i)} className="accent text-white text-xs px-3 py-1.5 rounded-lg">Sign &amp; order</button><button onClick={()=>dismissOrder(i)} className="text-xs px-3 py-1.5 rounded-lg border line">Dismiss</button></div>}
+            </div>
+          ))}
+          {adding ? (
+            <div className="border line rounded-xl p-3 mb-2 fade" style={{borderColor:'var(--accent)'}}>
+              <input autoFocus value={draft.t} onChange={e=>setDraft(s=>({...s,t:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addOrder()}
+                placeholder="Order or prescription (e.g. Bloods: TFTs, Chest X-ray, Amoxicillin 500mg)" className="w-full px-3 py-2 rounded-lg border line text-sm soft" style={{background:'var(--soft)'}}/>
+              <input value={draft.why} onChange={e=>setDraft(s=>({...s,why:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addOrder()}
+                placeholder="Clinical indication (optional)" className="w-full mt-2 px-3 py-2 rounded-lg border line text-sm soft" style={{background:'var(--soft)'}}/>
+              <div className="flex gap-2 mt-2">
+                <button onClick={addOrder} className="accent text-white text-xs px-3 py-1.5 rounded-lg">Add</button>
+                <button onClick={()=>{setAdding(false);setDraft({t:'',why:''});}} className="text-xs px-3 py-1.5 rounded-lg border line">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={()=>setAdding(true)} className="text-xs accent-t font-medium mt-1">+ Add order / prescription</button>
+          )}
+        </section>
+
+        {/* results & follow-up */}
+        <section ref={el=>refs.current.followup=el} className="card p-5">
+          <div className="text-sm font-medium mb-3">Results & Follow-up</div>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-sm sub">Follow-up in</span>
+            <select value={follow.when} onChange={e=>setFollow(s=>({...s,when:e.target.value}))} className="text-sm border line rounded-lg px-2 py-1.5 soft" style={{background:'var(--soft)'}}>
+              {['48 hours','1 week','2 weeks','1 month','3 months','PRN / as needed'].map(o=><option key={o}>{o}</option>)}
+            </select>
+          </div>
+          <label className="text-xs sub">Safety-net advice</label>
+          <textarea value={follow.note} onChange={e=>setFollow(s=>({...s,note:e.target.value}))} rows={2} className="w-full mt-1 px-3 py-2 rounded-xl border line text-sm soft" style={{background:'var(--soft)'}}/>
+          <div className="text-xs sub mt-2">Pending results from this encounter will surface in <b>Results</b> and on your dashboard for acknowledgement.</div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Patient record (full) ---------- */
+const SUBNAV = ['summary','encounters','history','medications','allergies','problems','orders','results','documents'];
+const SUBLABEL = { summary:'Patient Summary',encounters:'Encounters',history:'Medical History',medications:'Medications',allergies:'Allergies',problems:'Problems',orders:'Orders',results:'Results',documents:'Documents' };
+
+function List({ items, render, empty }){
+  if(!items || items.length===0) return <div className="text-sm sub py-8 text-center">{empty||'Nothing recorded.'}</div>;
+  return <div className="space-y-2">{items.map((it,i)=><div key={i} className="border line rounded-xl p-3">{render(it)}</div>)}</div>;
+}
+
+function PatientRecord({ id, back }){
+  const p = byId(id);
+  const [tab,setTab] = useState('summary');
+  const [encOpen,setEncOpen] = useState(false);
+  const [encDone,setEncDone] = useState(false);
+
+  if(encOpen) return (
+    <div className="max-w-6xl mx-auto">
+      <Encounter p={p} onClose={()=>setEncOpen(false)} onComplete={()=>setEncDone(true)} />
+    </div>
+  );
+
+  return (
+    <div className="max-w-6xl mx-auto fade">
+      <button onClick={back} className="text-sm sub mb-4 flex items-center gap-1">← Back</button>
+      {/* header */}
+      <div className="flex items-center gap-4 mb-5">
+        <div className="w-12 h-12 rounded-full accent text-white flex items-center justify-center font-semibold">{p.name.split(' ').map(n=>n[0]).join('')}</div>
+        <div className="flex-1">
+          <div className="text-xl font-semibold tracking-tight">{p.name}</div>
+          <div className="text-sm sub">{p.age}y · {p.sex} · {p.dob} · NHS {p.nhs} · {p.gp}</div>
+        </div>
+        {p.allergies.length>0
+          ? <span className="text-xs font-medium px-3 py-1.5 rounded-full" style={{background:'#fef2f2',color:'#dc2626'}}>⚠ Allergy: {p.allergies.map(a=>a.drug).join(', ')}</span>
+          : <span className="text-xs sub px-3 py-1.5 rounded-full soft" style={{background:'var(--soft)'}}>No known allergies</span>}
+      </div>
+
+      <div className="grid grid-cols-12 gap-5">
+        {/* sub-nav */}
+        <aside className="col-span-3">
+          <div className="card p-2 sticky top-6">
+            {SUBNAV.map(k=>(
+              <button key={k} onClick={()=>setTab(k)} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${tab===k?'':'sub'}`} style={tab===k?{background:'var(--accent-soft)',color:'#0f766e',fontWeight:600}:{}}>{SUBLABEL[k]}</button>
+            ))}
+          </div>
+        </aside>
+
+        {/* content */}
+        <div className="col-span-9 space-y-4">
+          {tab==='summary' && (
+            <>
+              <div className="card p-5 flex items-center justify-between">
+                <div><div className="text-sm font-medium">Patient Summary</div><div className="text-xs sub mt-0.5">Reason today: {p.reason} · <span className="inline-flex items-center gap-1"><Dot u={p.urgency}/>{p.urgency}</span></div></div>
+                <button onClick={()=>setEncOpen(true)} className="accent text-white text-sm px-4 py-2 rounded-xl">{encDone?'+ New encounter':'▶ Start clinical encounter'}</button>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="card p-5"><div className="text-sm font-medium mb-2">Active problems</div><List items={p.problems} empty="No active problems." render={it=><div className="flex justify-between text-sm"><span>{it.name}</span><span className="text-xs sub">since {it.since}</span></div>}/></div>
+                <div className="card p-5"><div className="text-sm font-medium mb-2">Current medications</div><List items={p.meds} empty="No current medications." render={it=><div className="text-sm"><span className="font-medium">{it.name}</span> <span className="sub">· {it.dose}</span></div>}/></div>
+                <div className="card p-5"><div className="text-sm font-medium mb-2">Recent results</div><List items={p.results.slice(0,4)} empty="No recent results." render={it=><div className="flex justify-between text-sm"><span>{it.test}</span><span className={it.flag?'font-semibold':''} style={it.flag?{color:'#dc2626'}:{}}>{it.val} {it.flag?'⬆':''}</span></div>}/></div>
+                <div className="card p-5"><div className="text-sm font-medium mb-2">Recent encounters</div><List items={p.encounters.slice(0,3)} empty="No prior encounters." render={it=><div className="text-sm"><div className="flex justify-between"><span className="font-medium">{it.type}</span><span className="text-xs sub">{it.date}</span></div><div className="text-xs sub">{it.summary}</div></div>}/></div>
+              </div>
+            </>
+          )}
+          {tab==='encounters' && <div className="card p-5"><div className="flex items-center justify-between mb-3"><span className="text-sm font-medium">Encounters</span><button onClick={()=>setEncOpen(true)} className="accent text-white text-xs px-3 py-1.5 rounded-lg">+ New encounter</button></div><List items={p.encounters} empty="No encounters recorded." render={it=><div><div className="flex justify-between"><span className="text-sm font-medium">{it.type} · {it.clinician}</span><span className="text-xs sub">{it.date}</span></div><div className="text-sm sub mt-0.5">{it.summary}</div></div>}/></div>}
+          {tab==='history' && <div className="card p-5"><div className="text-sm font-medium mb-3">Medical History</div><div className="space-y-3">{p.history.length===0?<div className="text-sm sub py-6 text-center">No history recorded.</div>:p.history.map((h,i)=>(<div key={i} className="flex gap-3"><div className="text-xs sub font-mono w-12 shrink-0">{h.date}</div><div className="w-2 h-2 rounded-full accent mt-1.5 shrink-0"></div><div className="text-sm">{h.event}</div></div>))}</div></div>}
+          {tab==='medications' && <div className="card p-5"><div className="text-sm font-medium mb-3">Medications (dm+d)</div><List items={p.meds} empty="No medications." render={it=><div className="flex justify-between text-sm"><div><span className="font-medium">{it.name}</span> <span className="sub">· {it.dose}</span></div><span className="text-xs sub">review {it.review}</span></div>}/></div>}
+          {tab==='allergies' && <div className="card p-5"><div className="text-sm font-medium mb-3">Allergies & intolerances</div>{p.allergies.length===0?<div className="text-sm sub py-6 text-center">No known drug allergies.</div>:<div className="space-y-2">{p.allergies.map((a,i)=><div key={i} className="rounded-xl p-3 text-sm" style={{background:'#fef2f2',color:'#b91c1c'}}>⚠ <b>{a.drug}</b> — {a.reaction}</div>)}</div>}</div>}
+          {tab==='problems' && <div className="card p-5"><div className="text-sm font-medium mb-3">Problem list</div><List items={p.problems} empty="No problems recorded." render={it=><div className="flex justify-between text-sm"><span className="font-medium">{it.name}</span><span className="text-xs px-2 py-0.5 rounded-full" style={{background:'var(--accent-soft)',color:'#0f766e'}}>{it.status} · {it.since}</span></div>}/></div>}
+          {tab==='orders' && <div className="card p-5"><div className="text-sm font-medium mb-3">Orders</div><List items={p.orders} empty="No orders." render={it=><div className="flex justify-between text-sm"><span>{it.item}</span><span className="text-xs px-2 py-0.5 rounded-full" style={{background:it.status==='Awaiting'?'#fef3c7':'#dcfce7',color:it.status==='Awaiting'?'#a16207':'#15803d'}}>{it.status} · {it.date}</span></div>}/></div>}
+          {tab==='results' && <div className="card p-5"><div className="text-sm font-medium mb-3">Results</div>{p.results.length===0?<div className="text-sm sub py-6 text-center">No results.</div>:<table className="w-full text-sm"><thead><tr className="text-[11px] sub uppercase text-left"><th className="py-1">Test</th><th>Value</th><th>Range</th><th>Date</th></tr></thead><tbody>{p.results.map((l,i)=><tr key={i} className="border-t line"><td className="py-2">{l.test}</td><td className={l.flag?'font-semibold':''} style={l.flag?{color:'#dc2626'}:{}}>{l.val} {l.flag?'⬆':''}</td><td className="sub text-xs">{l.range}</td><td className="sub text-xs">{l.date}</td></tr>)}</tbody></table>}</div>}
+          {tab==='documents' && <div className="card p-5"><div className="text-sm font-medium mb-3">Documents</div><List items={p.documents} empty="No documents." render={it=><div className="flex justify-between text-sm"><span>📄 {it.title}</span><span className="text-xs sub">{it.type} · {it.date}</span></div>}/></div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Calendar ---------- */
+const CAL_STATUS = {
+  scheduled:  { bg:'#f1f5f9', fg:'#475569', bd:'#cbd5e1', dot:'#94a3b8', label:'Scheduled' },
+  inprogress: { bg:'#ccfbf1', fg:'#0f766e', bd:'#5eead4', dot:'#14b8a6', label:'In progress' },
+  completed:  { bg:'#dcfce7', fg:'#15803d', bd:'#86efac', dot:'#22c55e', label:'Completed' },
+  awaiting:   { bg:'#fef3c7', fg:'#a16207', bd:'#fcd34d', dot:'#f59e0b', label:'Awaiting return' },
+  noshow:     { bg:'#fee2e2', fg:'#b91c1c', bd:'#fca5a5', dot:'#ef4444', label:'No-show' },
+  followup:   { bg:'#f5f3ff', fg:'#6d28d9', bd:'#c4b5fd', dot:'#8b5cf6', label:'Linked follow-up', dashed:true },
+};
+const CAL_HOURS = [8,9,10,11,12,13,14,15,16];
+const CAL_SEED = [
+  {d:0,h:9, time:'09:00',name:'Eleanor Acheson', s:'completed', reason:'Medication review',   age:72,nhs:'490 221 3380',dob:'03 Apr 1954',type:'Face-to-face',dur:'15 min',allergy:null,last:'12 Mar 2026'},
+  {d:0,h:13,time:'13:00',name:'Harold Briggs',   s:'completed', reason:'INR check',           age:80,nhs:'441 909 1122',dob:'19 Nov 1945',type:'Face-to-face',dur:'10 min',allergy:null,last:'02 May 2026'},
+  {d:1,h:8, time:'08:30',name:'Grace Nolan',     s:'completed', reason:'Asthma annual review', age:34,nhs:'502 117 7781',dob:'22 Jun 1991',type:'Face-to-face',dur:'20 min',allergy:null,last:'10 Jun 2025'},
+  {d:1,h:11,time:'11:00',name:'Daniel Webb',     s:'inprogress',reason:'Back pain',           age:47,nhs:'388 220 4419',dob:'14 Feb 1979',type:'Face-to-face',dur:'15 min',allergy:'Codeine',last:'28 Apr 2026'},
+  {d:2,h:10,time:'10:00',name:'Lucy Frost',      s:'completed', reason:'Contraception',        age:29,nhs:'610 554 0098',dob:'07 Sep 1996',type:'Telephone',  dur:'10 min',allergy:null,last:'—'},
+  {d:2,h:14,time:'14:00',name:'Martin Doyle',    s:'completed', reason:'Diabetes review',       age:61,nhs:'277 880 5511',dob:'30 Jan 1965',type:'Face-to-face',dur:'20 min',allergy:null,last:'05 Dec 2025'},
+  {d:3,h:9, time:'09:00',name:'Iris Maddox',     s:'awaiting',  reason:'Awaiting blood results',age:55,nhs:'901 224 6677',dob:'11 Oct 1970',type:'Telephone',  dur:'10 min',allergy:'Penicillin',last:'21 May 2026'},
+  {d:3,h:15,time:'15:30',name:'Raymond Patel',   s:'completed', reason:'Mole — 2WW discussion', age:58,nhs:'701 552 8841',dob:'11 Jan 1967',type:'Face-to-face',dur:'15 min',allergy:'Aspirin',last:'29 May 2026'},
+  {d:4,h:8, time:'08:00',name:'Arthur Cole',     s:'completed', reason:'COPD review',           age:69,nhs:'330 778 2244',dob:'02 Mar 1957',type:'Face-to-face',dur:'20 min',allergy:null,last:'18 Feb 2026'},
+  {d:4,h:12,time:'12:00',name:'Mei Tan',         s:'completed', reason:'Fatigue',              age:41,nhs:'558 119 3300',dob:'25 Aug 1984',type:'Telephone',  dur:'10 min',allergy:null,last:'—'},
+  {d:5,h:8, time:'08:00',name:'Lucy Frost',      s:'completed', reason:'Pill check',           age:29,nhs:'610 554 0098',dob:'07 Sep 1996',type:'Telephone',  dur:'10 min',allergy:null,last:'28 May 2026'},
+  {d:5,h:8, time:'08:30',name:'Grace Whitfield', s:'noshow',    reason:'Knee pain',            age:52,nhs:'129 887 6543',dob:'16 Dec 1973',type:'Face-to-face',dur:'15 min',allergy:null,last:'—'},
+  {d:5,h:9, time:'09:30',name:'Arthur Cole',     s:'noshow',    reason:'Spirometry',           age:69,nhs:'330 778 2244',dob:'02 Mar 1957',type:'Face-to-face',dur:'20 min',allergy:null,last:'18 Feb 2026'},
+  {d:5,h:11,time:'11:00',name:'Mei Tan',         s:'scheduled', reason:'Results follow-up',     age:41,nhs:'558 119 3300',dob:'25 Aug 1984',type:'Telephone',  dur:'10 min',allergy:null,last:'30 May 2026'},
+  {d:5,h:13,time:'13:00',name:'Martin Doyle',    s:'scheduled', reason:'Foot check',           age:61,nhs:'277 880 5511',dob:'30 Jan 1965',type:'Face-to-face',dur:'15 min',allergy:null,last:'27 May 2026'},
+  {d:5,h:15,time:'15:30',name:'Iris Maddox',     s:'followup',  reason:'Linked follow-up — results',age:55,nhs:'901 224 6677',dob:'11 Oct 1970',type:'Telephone',dur:'10 min',allergy:'Penicillin',last:'21 May 2026'},
+];
+
+function CalBlock({ a, onClick }){
+  const st = CAL_STATUS[a.s];
+  return (
+    <button onClick={onClick} className="w-full text-left rounded-lg px-2 py-1.5 mb-1 fade transition hover:brightness-95"
+      style={{ background:st.bg, color:st.fg, borderLeft:'3px '+(st.dashed?'dashed':'solid')+' '+st.bd }}>
+      <div className="text-[11px] font-mono" style={{opacity:.8}}>{a.time}</div>
+      <div className="text-[13px] font-medium leading-tight truncate">{a.name.split(' ').slice(-1)[0]}{a.name.includes('follow')?' · follow-up':''}</div>
+    </button>
+  );
+}
+
+function CalDrawer({ appt, onClose, onStatus, onOpenRecord }){
+  if(!appt) return null;
+  const st = CAL_STATUS[appt.s];
+  return (
+    <div className="fixed inset-0 z-30 fade" onClick={onClose}>
+      <div className="absolute inset-0" style={{background:'rgba(15,23,42,.25)'}}></div>
+      <div onClick={e=>e.stopPropagation()} className="absolute right-0 top-0 h-screen w-[380px] bg-white border-l line p-6 overflow-y-auto" style={{boxShadow:'-12px 0 40px rgba(0,0,0,.06)'}}>
+        <div className="flex items-center justify-between mb-5">
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{background:st.bg,color:st.fg}}>● {st.label}</span>
+          <button onClick={onClose} className="sub text-lg leading-none">✕</button>
+        </div>
+
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-12 h-12 rounded-full accent text-white flex items-center justify-center font-semibold">{appt.name.split(' ').map(n=>n[0]).slice(0,2).join('')}</div>
+          <div>
+            <div className="text-lg font-semibold tracking-tight leading-tight">{appt.name}</div>
+            <div className="text-xs sub">{appt.age}y · {appt.dob}</div>
+          </div>
+        </div>
+
+        {appt.allergy && <div className="text-xs font-medium px-3 py-2 rounded-xl mb-4" style={{background:'#fef2f2',color:'#dc2626'}}>⚠ Allergy: {appt.allergy}</div>}
+
+        <div className="space-y-3 text-sm">
+          {[['NHS number',appt.nhs],['Reason for visit',appt.reason],['Appointment',appt.time+' · '+appt.dur],['Type',appt.type],['Usual GP','Dr Ellis'],['Last seen',appt.last]].map((r,i)=>(
+            <div key={i} className="flex justify-between gap-4 border-b line pb-2 last:border-0">
+              <span className="sub">{r[0]}</span><span className="text-right font-medium">{r[1]}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5">
+          <div className="text-[11px] font-semibold sub uppercase mb-2">Update status</div>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(CAL_STATUS).map(([k,s])=>(
+              <button key={k} onClick={()=>onStatus(k)} className="text-xs px-2.5 py-1 rounded-lg border line transition"
+                style={appt.s===k?{background:s.bg,color:s.fg,borderColor:s.bd}:{}}>{s.label}</button>
+            ))}
+          </div>
+        </div>
+
+        <button onClick={onOpenRecord} className="w-full accent text-white text-sm py-2.5 rounded-xl mt-6">Open full record →</button>
+      </div>
+    </div>
+  );
+}
+
+function Calendar({ openRecord }){
+  const [appts,setAppts] = useState(CAL_SEED.map((a,i)=>({...a,_id:i})));
+  const [sel,setSel] = useState(null);            // selected appt _id
+  const [week,setWeek] = useState(0);             // week offset (0 = current)
+
+  // build day headers from a base Monday (26 May 2026) + offset
+  const base = new Date(2026,4,26);
+  const monday = new Date(base); monday.setDate(base.getDate()+week*7);
+  const days = Array.from({length:6},(_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); return d; });
+  const fmt = d => ['Mon','Tue','Wed','Thu','Fri','Sat'][ (d.getDay()+6)%7 ];
+  const label = `${days[0].getDate()}–${days[5].getDate()} ${monday.toLocaleString('en-GB',{month:'long',year:'numeric'})}`;
+  const visible = week===0 ? appts : [];          // appts only seeded for the current week
+  const selAppt = appts.find(a=>a._id===sel) || null;
+
+  function setStatus(s){ setAppts(list=>list.map(a=>a._id===sel?{...a,s}:a)); }
+  function addAppt(d,h){
+    const name = prompt('Patient name for new appointment?'); if(!name) return;
+    setAppts(list=>[...list,{ _id:Date.now(), d, h, time:`${String(h).padStart(2,'0')}:00`, name, s:'scheduled', reason:'New appointment', age:'—',nhs:'—',dob:'—',type:'Face-to-face',dur:'15 min',allergy:null,last:'—'}]);
+  }
+
+  return (
+    <div className="fade">
+      {/* header + legend */}
+      <div className="flex items-center gap-3 mb-4">
+        <h1 className="text-xl font-semibold tracking-tight">{label}</h1>
+        <div className="flex gap-1">
+          <button onClick={()=>setWeek(w=>w-1)} className="w-7 h-7 rounded-lg border line sub hover:bg-gray-50">‹</button>
+          <button onClick={()=>setWeek(0)} className="px-2.5 h-7 rounded-lg border line text-xs sub hover:bg-gray-50">Today</button>
+          <button onClick={()=>setWeek(w=>w+1)} className="w-7 h-7 rounded-lg border line sub hover:bg-gray-50">›</button>
+        </div>
+        <div className="ml-auto flex flex-wrap gap-x-4 gap-y-1 text-[11px] sub">
+          {Object.values(CAL_STATUS).map((s,i)=>(
+            <span key={i} className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{background:s.dot}}></span>{s.label}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* grid */}
+      <div className="card overflow-hidden p-0">
+        <div style={{ display:'grid', gridTemplateColumns:'56px repeat(6,1fr)' }}>
+          <div className="soft border-b line"></div>
+          {days.map((d,i)=>(
+            <div key={i} className="px-3 py-2.5 text-sm font-semibold soft border-b border-l line">{fmt(d)} <span className="font-normal sub">{d.getDate()}</span></div>
+          ))}
+          {CAL_HOURS.map(h=>(
+            <React.Fragment key={h}>
+              <div className="px-2 py-1 text-[11px] font-mono sub border-b line" style={{minHeight:80}}>{h}:00</div>
+              {days.map((_,di)=>{
+                const cell = visible.filter(a=>a.d===di && a.h===h);
+                return (
+                  <div key={di} className="p-1.5 border-b border-l line group" style={{minHeight:80}}>
+                    {cell.map(a=><CalBlock key={a._id} a={a} onClick={()=>setSel(a._id)}/>)}
+                    {cell.length===0 && <button onClick={()=>addAppt(di,h)} className="w-full h-full min-h-[40px] opacity-0 group-hover:opacity-100 transition text-xs accent-t">+ add</button>}
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+      {week!==0 && <div className="text-center sub text-sm mt-4">No appointments seeded for this week — click a slot to add one, or press Today.</div>}
+
+      <CalDrawer appt={selAppt} onClose={()=>setSel(null)} onStatus={setStatus} onOpenRecord={()=>{ const n=selAppt&&selAppt.name; setSel(null); openRecord(n); }}/>
+    </div>
+  );
+}
+
+/* ---------- Messages / Reports / Admin ---------- */
+function Messages(){
+  const threads = [
+    ['Iris Maddox','Re: blood results — when will they be back?','2h','unread'],
+    ['Pharmacy — Boots High St','EPS query: Amlodipine for D. Okafor','4h',''],
+    ['District nurse team','Wound review request — H. Briggs','Yesterday',''],
+    ['Lucy Frost','Thank you for the appointment','2d',''],
+  ];
+  return (
+    <div className="max-w-4xl mx-auto fade">
+      <h1 className="text-2xl font-semibold tracking-tight mb-4">Messages</h1>
+      <div className="card overflow-hidden">
+        {threads.map((t,i)=>(
+          <div key={i} className="row flex items-center gap-3 px-4 py-3 border-b line last:border-0">
+            <div className="w-9 h-9 rounded-full soft flex items-center justify-center text-xs font-semibold sub" style={{background:'var(--soft)'}}>{t[0].split(' ').map(n=>n[0]).slice(0,2).join('')}</div>
+            <div className="flex-1"><div className="text-sm font-medium flex items-center gap-2">{t[0]}{t[3]==='unread'&&<span className="w-2 h-2 rounded-full accent"></span>}</div><div className="text-xs sub">{t[1]}</div></div>
+            <div className="text-xs sub">{t[2]}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function Reports(){
+  const cards = [['Clinic utilisation','91%','+6% vs last week'],['DNA rate','3.2%','−1.8% with AI reminders'],['Same-day demand met','88%',''],['2WW within target','100%','']];
+  return (
+    <div className="max-w-5xl mx-auto fade">
+      <h1 className="text-2xl font-semibold tracking-tight mb-4">Reports</h1>
+      <div className="grid grid-cols-4 gap-4 mb-5">
+        {cards.map((c,i)=><div key={i} className="card p-5"><div className="text-2xl font-semibold accent-t">{c[1]}</div><div className="text-xs sub mt-1">{c[0]}</div>{c[2]&&<div className="text-[11px] mt-0.5" style={{color:'#059669'}}>{c[2]}</div>}</div>)}
+      </div>
+      <div className="card p-5"><div className="text-sm font-medium mb-3">QOF & chronic disease registers</div>{[['Diabetes review','12 overdue'],['Hypertension review','7 overdue'],['Asthma review','4 overdue'],['Smoking review','9 overdue']].map((r,i)=><div key={i} className="flex justify-between py-2 border-b line last:border-0 text-sm"><span>{r[0]}</span><span className="sub">{r[1]}</span></div>)}</div>
+    </div>
+  );
+}
+function Admin(){
+  const items=[['Users & roles','Manage GP, nurse, receptionist & manager access'],['Appointment templates','Slot types, durations, urgency bands'],['Communication templates','SMS / NHS App / letter templates & consent'],['Integrations','NHS Spine PDS, EPS, e-RS, pathology (LIMS), DICOM'],['Audit log','Immutable record of all access & actions'],['Practice details','Opening hours, sites, clinicians']];
+  return (
+    <div className="max-w-4xl mx-auto fade">
+      <h1 className="text-2xl font-semibold tracking-tight mb-4">Admin</h1>
+      <div className="grid grid-cols-2 gap-4">
+        {items.map((it,i)=><button key={i} className="card p-5 text-left row"><div className="text-sm font-medium">{it[0]}</div><div className="text-xs sub mt-1">{it[1]}</div></button>)}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- App ---------- */
+function App(){
+  const [nav,setNav] = useState('dashboard');
+  const [patient,setPatient] = useState(null);
+  function open(id){ setPatient(id); setNav('record'); }
+  function go(k){ setPatient(null); setNav(k); }
+  function openRecord(name){ const m=PATIENTS.find(p=>p.name===name); if(m) open(m.id); else go('patients'); }
+
+  return (
+    <div className="flex">
+      <Sidebar nav={nav==='record'?'patients':nav} go={go}/>
+      <main className="flex-1 min-w-0 px-8 py-7">
+        {nav==='dashboard' && <Dashboard open={open}/>}
+        {nav==='record' && <PatientRecord id={patient} back={()=>go('patients')}/>}
+        {nav==='patients' && <PatientsList open={open}/>}
+        {nav==='appointments' && <Calendar openRecord={openRecord}/>}
+        {nav==='messages' && <Messages/>}
+        {nav==='reports' && <Reports/>}
+        {nav==='admin' && <Admin/>}
+      </main>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

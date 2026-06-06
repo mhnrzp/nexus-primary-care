@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXUS — Front Desk (Live Calls)</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{ --accent:#0d9488; --accent-soft:#ccfbf1; --ink:#111827; --sub:#6b7280; --line:#ececec; --bg:#ffffff; --soft:#fafafa; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Inter','Segoe UI',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  .sub{ color:var(--sub); } .line{ border-color:var(--line); } .soft{ background:var(--soft); }
+  .accent{ background:var(--accent); } .accent-t{ color:var(--accent); }
+  button{ font-family:inherit; cursor:pointer; border:none; background:none; }
+  button:focus-visible,input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .nav{ color:var(--sub); border-radius:12px; transition:.12s; } .nav:hover{ background:#f4f4f5; color:var(--ink); } .nav.on{ background:var(--accent); color:#fff; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:16px; }
+  .row:hover{ background:var(--soft); }
+  .fade{ animation:f .25s ease-out; } @keyframes f{ from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:none;} }
+  .live{ animation:pulse 1.4s infinite; } @keyframes pulse{ 0%{opacity:1;} 50%{opacity:.35;} 100%{opacity:1;} }
+  .ring{ animation:rng 1s infinite; } @keyframes rng{ 0%,100%{transform:rotate(0);} 25%{transform:rotate(-12deg);} 75%{transform:rotate(12deg);} }
+  ::-webkit-scrollbar{ width:8px; } ::-webkit-scrollbar-thumb{ background:#e4e4e7; border-radius:4px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>tailwind.config={corePlugins:{preflight:false}};</script>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+/* ---------- urgency tiers ---------- */
+const TIER = {
+  Routine:   { dot:'#10b981', bg:'#dcfce7', fg:'#15803d' },
+  Soon:      { dot:'#f59e0b', bg:'#fef3c7', fg:'#a16207' },
+  Urgent:    { dot:'#f97316', bg:'#ffedd5', fg:'#c2410c' },
+  Emergency: { dot:'#ef4444', bg:'#fee2e2', fg:'#b91c1c' },
+};
+function Tier({ t }){ if(!t) return null; const u=TIER[t]; return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{background:u.bg,color:u.fg}}>{t}</span>; }
+
+const STATUS = {
+  ringing:        { label:'Ringing',          c:'#94a3b8' },
+  talking:        { label:'AI talking',        c:'#0d9488' },
+  triaging:       { label:'Screening urgency', c:'#0891b2' },
+  'await-approval':{ label:'Booking — approve', c:'#f59e0b' },
+  joined:         { label:'Staff on call',     c:'#7c3aed' },
+  emergency:      { label:'EMERGENCY',         c:'#ef4444' },
+  booked:         { label:'Booked',            c:'#10b981' },
+  ended:          { label:'Ended',             c:'#94a3b8' },
+};
+
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat']; const DATES=[2,3,4,5,6,7]; const HOURS=[8,9,10,11,12,13,14,15,16]; const TODAY=0;
+function nextSlot(bookings, tier){
+  const day = Math.min(tier==='Urgent'?TODAY:tier==='Soon'?TODAY+1:TODAY+3,5);
+  for(const h of HOURS){ if(!bookings.some(b=>b.day===day&&b.hour===h)) return {day,hour:h,time:`${String(h).padStart(2,'0')}:00`}; }
+  return {day,hour:16,time:'16:00'};
+}
+const L=(who,t)=>({line:{who,t}});
+
+/* ---------- call scripts (each event consumes a tick) ---------- */
+function makeCalls(){
+  return [
+    { id:'c1', phone:'079 0011 2233', status:'ringing', name:null,dob:null,symptoms:null,urgency:null,proposed:null, lines:[], secs:0, queue:[
+      {},
+      {...L('ai','Oakfield Surgery, AI assistant speaking. Can I take your name?'), status:'talking'},
+      {...L('pt','Margaret Hughes.'), set:{name:'Margaret Hughes', mrn:'OAK-04821'}},
+      L('ai','Thanks Margaret. And your date of birth?'),
+      {...L('pt','14th of March 1957.'), set:{dob:'14 Mar 1957'}},
+      L('ai','What can I help with today?'),
+      {...L('pt','A sore throat and a fever for three days.'), set:{symptoms:'Sore throat + fever, 3 days'}},
+      {...L('ai','Any difficulty breathing or swallowing, or swelling in your neck?'), status:'triaging'},
+      {...L('pt','No, nothing like that.'), set:{urgency:'Soon'}},
+      {...L('ai','That doesn\'t sound urgent but is worth a GP call. I can book you in — let me confirm with the practice.'), status:'await-approval', set:{proposed:{reason:'Sore throat + fever 3d · no red flags', urgency:'Soon'}}},
+    ]},
+    { id:'c2', phone:'078 5544 9090', status:'ringing', name:null,dob:null,symptoms:null,urgency:null,proposed:null, lines:[], secs:0, queue:[
+      {},{},
+      {...L('ai','Oakfield Surgery, can I take your name?'), status:'talking'},
+      {...L('pt','Tom Bennett… I\'ve got a crushing pain in my chest and my left arm, started 20 minutes ago, feeling sick.'), set:{name:'Tom Bennett', mrn:'OAK-07734', symptoms:'Chest pain radiating to L arm, acute onset + nausea'}},
+      {...L('sys','⚠ RED FLAG — possible cardiac event. Booking suppressed.'), set:{urgency:'Emergency'}, status:'emergency'},
+      L('ai','Tom, this needs emergency help right now — please call 999 immediately or get to A&E. I\'m alerting the duty team. Don\'t drive yourself.'),
+    ]},
+    { id:'c3', phone:'077 2200 1188', status:'ringing', name:null,dob:null,symptoms:null,urgency:null,proposed:null, lines:[], secs:0, queue:[
+      {},{},{},
+      {...L('ai','Oakfield Surgery, AI assistant. Your name please?'), status:'talking'},
+      {...L('pt','Aisha Khan.'), set:{name:'Aisha Khan', mrn:'OAK-05190'}},
+      L('ai','Thanks Aisha, date of birth?'),
+      {...L('pt','22nd November 1995.'), set:{dob:'22 Nov 1995'}},
+      L('ai','How can I help?'),
+      {...L('pt','Hay fever — itchy eyes and sneezing.'), set:{symptoms:'Hay fever symptoms',urgency:'Routine'}},
+      {...L('ai','A pharmacist can help with that today, but I can also book a routine GP review if you\'d prefer — let me confirm.'), status:'await-approval', set:{proposed:{reason:'Hay fever · routine review', urgency:'Routine'}}},
+    ]},
+    { id:'c4', phone:'079 8800 4747', status:'ringing', name:null,dob:null,symptoms:null,urgency:null,proposed:null, lines:[], secs:0, queue:[
+      {},{},{},{},{},
+      {...L('ai','Oakfield Surgery. Can I take your name?'), status:'talking'},
+      {...L('pt','David Okafor.'), set:{name:'David Okafor', mrn:'OAK-06320'}},
+      L('ai','Thanks David, date of birth?'),
+      {...L('pt','2nd September 1981.'), set:{dob:'02 Sep 1981'}},
+      L('ai','What do you need today?'),
+      {...L('pt','A blood pressure review, and I ran out of my tablets.'), set:{symptoms:'BP review + repeat medication',urgency:'Soon'}},
+      {...L('ai','I\'ll sort the review and flag the repeat. Let me book you in.'), status:'await-approval', set:{proposed:{reason:'BP review + repeat meds', urgency:'Soon'}}},
+    ]},
+  ];
+}
+
+/* ---------- Live Calls board ---------- */
+function CallCard({ c, active, onClick, onCallback }){
+  const st = STATUS[c.status]; const ident = c.name || 'Identifying…';
+  const mmss = `${String(Math.floor(c.secs/60)).padStart(2,'0')}:${String(c.secs%60).padStart(2,'0')}`;
+  const liveDot = !['booked','ended'].includes(c.status);
+  const missed = c.urgency==='Urgent' && c.status==='ended';
+  return (
+    <div onClick={onClick} className={`card p-3 mb-2 fade cursor-pointer ${active?'ring-2':''}`} style={active?{boxShadow:'0 0 0 2px var(--accent)'}:c.status==='emergency'?{borderColor:'#fca5a5'}:{}}>
+      <div className="flex items-center gap-2">
+        <span className={c.status==='ringing'?'ring':liveDot?'live':''} style={{color:st.c}}>{c.status==='ringing'?'📞':'●'}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium truncate">{ident}</div>
+          <div className="text-xs sub truncate">{c.mrn?`MRN ${c.mrn}`:c.phone}</div>
+        </div>
+        {c.urgency && <Tier t={c.urgency}/>}
+      </div>
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{background:st.c+'22',color:st.c}}>{st.label}</span>
+        <span className="text-[11px] sub font-mono">{c.status==='ringing'?'—':mmss}</span>
+      </div>
+      {missed && (
+        <button onClick={e=>{e.stopPropagation();onCallback(c);}} className="mt-2 w-full text-sm py-1.5 rounded-lg text-white flex items-center justify-center gap-1.5" style={{background:c.urgency==='Emergency'?'#dc2626':'#f97316'}}>
+          📞 Call back
+        </button>
+      )}
+    </div>
+  );
+}
+
+function CallDetail({ c, onJoin }){
+  const boxRef = useRef(null);
+  useEffect(()=>{ if(boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight; },[c&&c.lines.length]);
+  if(!c) return <div className="card flex items-center justify-center sub text-sm" style={{height:600}}>Select a call to listen in.</div>;
+  const st = STATUS[c.status];
+  const liveActive = ['ringing','talking','triaging','await-approval'].includes(c.status);
+  return (
+    <div className="card flex flex-col" style={{height:600}}>
+      <div className="px-4 py-3 border-b line flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold truncate">{c.name||'Identifying caller…'}</div>
+          <div className="text-xs sub truncate">{c.mrn?`MRN ${c.mrn} · `:''}{c.phone}{c.dob?` · DOB ${c.dob}`:''}</div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{background:st.c+'22',color:st.c}}>{st.label}</span>
+          {liveActive && <button onClick={()=>onJoin(c)} className="text-xs text-white px-3 py-1.5 rounded-lg flex items-center gap-1" style={{background:'#7c3aed'}}>📞 Join call</button>}
+          {c.status==='joined' && <span className="text-xs px-2 py-1 rounded-full" style={{background:'#ede9fe',color:'#7c3aed'}}>You're on the call</span>}
+        </div>
+      </div>
+      {/* transcript */}
+      <div ref={boxRef} className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
+        <div className="text-[11px] sub uppercase tracking-wide mb-1">Live transcript</div>
+        {c.lines.length===0 && <div className="sub text-sm">Connecting…</div>}
+        {c.lines.map((m,i)=> m.who==='sys' ? (
+          <div key={i} className="text-center text-xs rounded-md py-1.5 px-3 fade" style={{background:'#fef2f2',color:'#b91c1c'}}>{m.t}</div>
+        ) : (
+          <div key={i} className={`flex ${m.who==='ai'?'justify-start':'justify-end'} fade`}>
+            <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.who==='ai'?'accent text-white rounded-tl-sm':'soft border line rounded-tr-sm'}`} style={m.who!=='ai'?{background:'var(--soft)'}:{}}>{m.t}</div>
+          </div>
+        ))}
+      </div>
+      {/* captured strip */}
+      <div className="border-t line p-3 grid grid-cols-4 gap-2 text-xs">
+        <Cap l="Name" v={c.name}/><Cap l="DOB" v={c.dob}/><Cap l="Symptoms" v={c.symptoms}/>
+        <div><div className="sub">Urgency</div>{c.urgency?<Tier t={c.urgency}/>:<span className="sub">—</span>}</div>
+      </div>
+    </div>
+  );
+}
+function Cap({l,v}){ return <div><div className="sub">{l}</div><div className="font-medium truncate">{v||'—'}</div></div>; }
+
+function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
+  const [expand,setExpand] = useState(false);
+  const [editing,setEditing] = useState(false);
+  const [reason,setReason] = useState(c.proposed?c.proposed.reason:'');
+  if(c.status==='emergency'){
+    return (
+      <div className="card p-4 mb-3 fade" style={{borderColor:'#fca5a5'}}>
+        <div className="text-sm font-semibold" style={{color:'#b91c1c'}}>🚨 Emergency — {c.name}</div>
+        {c.mrn && <div className="text-[11px] sub">MRN {c.mrn}</div>}
+        <div className="text-xs sub mt-1">{c.symptoms}</div>
+        <div className="text-xs mt-1" style={{color:'#b91c1c'}}>999 advised · no booking · duty team alerted.</div>
+        <div className="flex gap-2 mt-3">
+          <button onClick={()=>onOpen(c.id)} className="text-sm px-3 py-1.5 rounded-lg border line">Listen in</button>
+          <button onClick={()=>onAck(c)} className="text-white text-sm px-3 py-1.5 rounded-lg flex-1" style={{background:'#dc2626'}}>Acknowledge</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="card p-4 mb-3 fade" style={{borderColor:'#fcd34d'}}>
+      <button onClick={()=>onOpen(c.id)} className="text-left w-full">
+        <div className="text-sm font-semibold">Proposed: Book {c.proposed.urgency==='Routine'?'routine':c.proposed.urgency.toLowerCase()} GP slot</div>
+        <div className="text-xs sub mt-0.5">{c.name}{c.mrn?` · MRN ${c.mrn}`:''}</div>
+      </button>
+      {editing
+        ? <input value={reason} onChange={e=>setReason(e.target.value)} className="w-full mt-2 px-3 py-2 rounded-lg soft border line text-sm" style={{background:'var(--soft)'}}/>
+        : <div className="text-xs sub mt-1.5">{c.proposed.urgency} · {c.proposed.reason}</div>}
+      <div className="text-[11px] sub mt-1.5">Agent confidence: High</div>
+      <button onClick={()=>setExpand(e=>!e)} className="text-[11px] accent-t mt-1.5">{expand?'▴ Less details':'▾ More details'}</button>
+      {expand && (
+        <div className="mt-2 border-t line pt-2 space-y-1 text-[11px] sub fade">
+          <div>Captured from full call transcript · DOB {c.dob||'—'}</div>
+          <div>Red-flag screen: negative</div>
+          <div>Patient NOT notified until you approve.</div>
+        </div>
+      )}
+      <div className="flex gap-2 mt-3">
+        <button onClick={()=>onApprove(c, editing?reason:null)} className="accent text-white text-sm py-2 rounded-lg flex-1">Approve</button>
+        <button onClick={()=>{ if(editing){onEdit(c,reason);setEditing(false);} else setEditing(true); }} className="border line text-sm px-3 py-2 rounded-lg">{editing?'Save':'Edit'}</button>
+        <button onClick={()=>onReject(c)} className="border line text-sm px-3 py-2 rounded-lg">Reject</button>
+      </div>
+    </div>
+  );
+}
+
+function ApprovalsPanel({ calls, onApprove, onReject, onEdit, onAck, onOpen }){
+  const queue = calls.filter(c=> c.status==='await-approval' || (c.status==='emergency' && !c.ack));
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs font-semibold sub uppercase tracking-wide">Needs staff action</span>
+        {queue.length>0 && <span className="text-[10px] text-white px-1.5 rounded-full" style={{background:'#f59e0b'}}>{queue.length}</span>}
+      </div>
+      {queue.length===0 && <div className="card p-6 text-center text-sm sub">Nothing waiting. Booking proposals and emergencies appear here for you to approve.</div>}
+      {queue.map(c=><ApprovalCard key={c.id} c={c} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={onOpen}/>)}
+    </div>
+  );
+}
+
+function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onCallback }){
+  const active = calls.filter(c=>!['booked','ended'].includes(c.status));
+  const selCall = calls.find(c=>c.id===sel) || null;
+  return (
+    <div className="max-w-7xl mx-auto fade">
+      <div className="flex items-center gap-3 mb-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Live calls</h1>
+        <span className="text-xs font-medium px-2 py-1 rounded-full" style={{background:'var(--accent-soft)',color:'#0f766e'}}>{active.length} on the line</span>
+      </div>
+      <p className="sub text-sm mb-5">The AI agent is handling every call at once. Listen in on the left; approve or reject the bookings it proposes on the right.</p>
+      <div className="grid grid-cols-12 gap-5">
+        <div className="col-span-3">
+          <div className="text-xs font-semibold sub uppercase tracking-wide mb-3">On the line</div>
+          {calls.map(c=><CallCard key={c.id} c={c} active={sel===c.id} onClick={()=>setSel(c.id)} onCallback={onCallback}/>)}
+        </div>
+        <div className="col-span-6"><CallDetail c={selCall}/></div>
+        <div className="col-span-3"><ApprovalsPanel calls={calls} onApprove={onApprove} onReject={onReject} onEdit={onEdit} onAck={onAck} onOpen={setSel}/></div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Calendar ---------- */
+function Calendar({ bookings }){
+  return (
+    <div className="max-w-6xl mx-auto fade">
+      <div className="flex items-center gap-3 mb-4">
+        <h1 className="text-xl font-semibold tracking-tight">This week · June 2026</h1>
+        <div className="ml-auto flex gap-x-4 text-[11px] sub">{Object.entries(TIER).map(([k,v])=><span key={k} className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{background:v.dot}}></span>{k}</span>)}</div>
+      </div>
+      <div className="card overflow-hidden">
+        <div style={{display:'grid',gridTemplateColumns:'56px repeat(6,1fr)'}}>
+          <div className="soft border-b line"></div>
+          {DAYS.map((d,i)=><div key={i} className="px-3 py-2.5 text-sm font-semibold soft border-b border-l line">{d} <span className="font-normal sub">{DATES[i]}</span>{i===TODAY&&<span className="ml-1 text-[10px] accent-t">today</span>}</div>)}
+          {HOURS.map(h=>(
+            <React.Fragment key={h}>
+              <div className="px-2 py-1 text-[11px] font-mono sub border-b line" style={{minHeight:74}}>{h}:00</div>
+              {DAYS.map((_,di)=>(
+                <div key={di} className="p-1.5 border-b border-l line" style={{minHeight:74}}>
+                  {bookings.filter(b=>b.day===di&&b.hour===h).map(b=>(
+                    <div key={b.id} className="rounded-lg px-2 py-1.5 mb-1 fade" style={{background:TIER[b.urgency].bg,color:TIER[b.urgency].fg,borderLeft:'3px solid '+TIER[b.urgency].dot}}>
+                      <div className="text-[11px] font-mono" style={{opacity:.8}}>{b.time}</div>
+                      <div className="text-[13px] font-medium leading-tight truncate">{b.name.split(' ').slice(-1)[0]}</div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Sidebar + topbar ---------- */
+const NAV = [['calls','Live Calls', <path d="M5 4h4l2 5-2 1a11 11 0 005 5l1-2 5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/>],['calendar','Calendar', <path d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4"/>]];
+function Sidebar({ nav, go }){
+  return (
+    <aside className="w-56 shrink-0 h-screen sticky top-0 px-3 py-5 border-r line bg-white flex flex-col">
+      <div className="flex items-center gap-2 px-3 mb-7"><div className="accent text-white font-bold rounded-xl w-8 h-8 flex items-center justify-center text-sm">N</div><span className="font-semibold tracking-tight">NEXUS</span></div>
+      <div className="px-3 text-[11px] font-medium sub tracking-widest mb-2">FRONT DESK</div>
+      <nav className="space-y-1">{NAV.map(([k,label,d])=><button key={k} onClick={()=>go(k)} className={`nav w-full flex items-center gap-3 px-3 py-2.5 text-sm ${nav===k?'on':''}`}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{d}</svg><span>{label}</span></button>)}</nav>
+      <div className="mt-auto px-3 flex items-center gap-2"><div className="w-8 h-8 rounded-full accent text-white flex items-center justify-center text-xs font-semibold">RC</div><div className="text-xs"><div className="font-medium">Reception</div><div className="sub">Oakfield Surgery</div></div></div>
+    </aside>
+  );
+}
+
+function Bell({ notes, onOpen, open, onPick }){
+  const unread = notes.filter(n=>!n.read).length;
+  return (
+    <div className="relative">
+      <button onClick={onOpen} className="relative w-9 h-9 rounded-xl border line hover:bg-gray-50 flex items-center justify-center">
+        🔔{unread>0 && <span className="absolute -top-1 -right-1 text-[10px] text-white rounded-full px-1.5" style={{background:'#ef4444'}}>{unread}</span>}
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-80 card p-2 z-20 fade" style={{boxShadow:'0 12px 40px rgba(0,0,0,.1)'}}>
+          <div className="text-xs font-semibold sub px-2 py-1">Notifications</div>
+          {notes.length===0 && <div className="text-sm sub text-center py-6">Nothing yet.</div>}
+          {notes.map(n=>(
+            <button key={n.id} onClick={()=>onPick(n)} className="row w-full text-left px-2 py-2 rounded-lg flex gap-2 items-start">
+              <span style={{color:n.type==='emergency'?'#ef4444':'#0d9488'}}>{n.type==='emergency'?'🚨':'📅'}</span>
+              <div className="flex-1"><div className="text-sm">{n.text}</div><div className="text-[11px] sub">{n.time}</div></div>
+              {!n.read && <span className="w-2 h-2 rounded-full accent mt-1"></span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- App ---------- */
+function App(){
+  const [nav,setNav] = useState('calls');
+  const [calls,setCalls] = useState(makeCalls);
+  const [sel,setSel] = useState('c1');
+  const [bookings,setBookings] = useState([
+    { id:1, name:'James Patterson', reason:'Knee follow-up', urgency:'Routine', day:2, hour:12, time:'12:00' },
+    { id:2, name:'Grace Nolan', reason:'Asthma review', urgency:'Routine', day:3, hour:9, time:'09:00' },
+  ]);
+  const [notes,setNotes] = useState([]);
+  const [bellOpen,setBell] = useState(false);
+  const notified = useRef(new Set());
+
+  // simulation tick
+  useEffect(()=>{
+    const iv = setInterval(()=>{
+      setCalls(cs=>cs.map(c=>{
+        const nc = {...c};
+        if(!['booked','ended'].includes(c.status) && c.status!=='ringing') nc.secs = c.secs + 5;
+        if(c.queue.length===0) return nc;
+        const [ev,...rest] = c.queue;
+        nc.queue = rest;
+        if(ev.line) nc.lines = [...c.lines, ev.line];
+        if(ev.set) Object.assign(nc, ev.set);
+        if(ev.status) nc.status = ev.status;
+        return nc;
+      }));
+    },1300);
+    return ()=>clearInterval(iv);
+  },[]);
+
+  // raise notifications on key transitions
+  useEffect(()=>{
+    calls.forEach(c=>{
+      const key = c.id+':'+c.status;
+      if((c.status==='await-approval'||c.status==='emergency') && !notified.current.has(key)){
+        notified.current.add(key);
+        setNotes(n=>[{ id:key, type:c.status==='emergency'?'emergency':'booking', callId:c.id, read:false,
+          text: c.status==='emergency' ? `🚨 Emergency on call from ${c.name} — 999 advised` : `${c.name} — booking awaiting your approval`,
+          time: new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) }, ...n]);
+      }
+    });
+  },[calls]);
+
+  function approve(c, editedReason){
+    const reason = editedReason || c.proposed.reason;
+    const slot = nextSlot(bookings, c.proposed.urgency);
+    setBookings(b=>[...b,{ id:Date.now(), name:c.name, reason, urgency:c.proposed.urgency, ...slot }]);
+    setCalls(cs=>cs.map(x=>x.id===c.id?{...x,status:'booked'}:x));
+    setNotes(n=>[{ id:'bk'+c.id, type:'booking', read:false, callId:c.id, text:`✓ ${c.name} booked — ${DAYS[slot.day]} ${slot.time}`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
+  }
+  function reject(c){ setCalls(cs=>cs.map(x=>x.id===c.id?{...x,status:'ended'}:x)); }
+  function editProposed(c, reason){ setCalls(cs=>cs.map(x=>x.id===c.id?{...x,proposed:{...x.proposed,reason}}:x)); }
+  function ack(c){ setCalls(cs=>cs.map(x=>x.id===c.id?{...x,ack:true}:x)); }
+  function callback(c){
+    const first = (c.name||'there').split(' ')[0];
+    const proposed = c.proposed || { reason:'Follow-up after earlier call', urgency: c.urgency==='Emergency'?'Urgent':(c.urgency||'Soon') };
+    setCalls(cs=>cs.map(x=>x.id===c.id?{...x, ack:false, status:'ringing', secs:0, proposed, queue:[
+      {},
+      {...L('ai',`Hello ${first}, this is Oakfield Surgery calling you back about your earlier call. Is now a good time?`), status:'talking'},
+      L('pt','Yes, thank you for calling back.'),
+      {...L('ai','I can arrange a GP appointment to follow this up — shall I book it for you?'), status:'await-approval'},
+    ]}:x));
+    setSel(c.id);
+    setNotes(n=>[{ id:'cb'+c.id+Date.now(), type:'booking', read:false, callId:c.id, text:`📞 Calling back ${c.name}`, time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) },...n]);
+  }
+  function openBell(){ setBell(o=>!o); if(!bellOpen) setNotes(n=>n.map(x=>({...x,read:true}))); }
+  function pickNote(n){ setBell(false); setNav('calls'); if(n.callId) setSel(n.callId); }
+
+  return (
+    <div className="flex">
+      <Sidebar nav={nav} go={setNav}/>
+      <div className="flex-1 min-w-0">
+        <header className="flex items-center gap-3 px-8 py-3 border-b line bg-white sticky top-0 z-10">
+          <div className="ml-auto"><Bell notes={notes} open={bellOpen} onOpen={openBell} onPick={pickNote}/></div>
+        </header>
+        <main className="px-8 py-7">
+          {nav==='calls' && <LiveCalls calls={calls} sel={sel} setSel={setSel} onApprove={approve} onReject={reject} onEdit={editProposed} onAck={ack} onCallback={callback}/>}
+          {nav==='calendar' && <Calendar bookings={bookings}/>}
+        </main>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
