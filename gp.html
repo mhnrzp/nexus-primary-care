@@ -93,11 +93,11 @@ function Dot({ u }){ return <span style={{background:DOTS[u]}} className="inline
 /* ---------- Sidebar ---------- */
 function Sidebar({ nav, go }){
   return (
-    <aside className="w-60 shrink-0 h-screen sticky top-0 px-3 py-5 border-r line bg-white flex flex-col">
-      <div className="flex items-center gap-2 px-3 mb-7">
+    <aside className="w-60 shrink-0 h-screen sticky top-0 px-3 pt-4 pb-5 border-r line bg-white flex flex-col">
+      <div className="px-3 mb-[18px]">
         <img src="logo.svg" alt="NEXUS" style={{height:24}}/>
+        <div className="text-[11px] font-medium sub tracking-widest mt-1">PRIMARY CARE · GP</div>
       </div>
-      <div className="px-3 text-[11px] font-medium sub tracking-widest mb-2">PRIMARY CARE · GP</div>
       <nav className="space-y-1">
         {NAV.map(([k,label,d])=>(
           <button key={k} onClick={()=>go(k)} className={`nav w-full flex items-center gap-3 px-3 py-2.5 text-sm ${nav===k?'on':''}`}>
