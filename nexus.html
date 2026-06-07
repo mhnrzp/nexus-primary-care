@@ -3,8 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NEXUS — Unified Healthcare Platform (Primary Care demo)</title>
+<title>Platform · HOS</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<meta name="description" content="HOS — unified AI healthcare platform for NHS primary care: role-based views, call handling, urgency engine, approval queue and audit." />
+<meta name="theme-color" content="#005EB6" />
+<meta name="color-scheme" content="light" />
+<link rel="preconnect" href="https://unpkg.com" crossorigin />
+<link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin />
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -172,7 +177,7 @@ function Sidebar({ nav, setNav, approvalsCount }){
   return (
     <aside className="w-60 shrink-0 bdr bd h-screen sticky top-0 flex flex-col" style={{background:'var(--sidebar)',borderRight:'1px solid var(--border)',borderTop:'none',borderBottom:'none',borderLeft:'none'}}>
       <div className="px-4 py-4 bdb flex flex-col gap-1">
-        <img src="logo.svg" alt="NEXUS" style={{height:24,alignSelf:'flex-start'}}/>
+        <img src="logo.svg" alt="HOS" style={{height:24,alignSelf:'flex-start'}}/>
         <div className="text-[10px] text-sub">Unified Healthcare Platform</div>
       </div>
 

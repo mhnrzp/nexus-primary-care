@@ -3,8 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NEXUS — GP</title>
+<title>GP Workspace · HOS</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<meta name="description" content="HOS GP Workspace — clinician dashboard, patient records, AI-assisted encounters and ordering for NHS primary care." />
+<meta name="theme-color" content="#0D9488" />
+<meta name="color-scheme" content="light" />
+<link rel="preconnect" href="https://unpkg.com" crossorigin />
+<link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin />
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -150,7 +155,7 @@ function Sidebar({ nav, go }){
   return (
     <aside className="w-60 shrink-0 h-screen sticky top-0 px-3 pt-7 pb-5 border-r line bg-white flex flex-col">
       <div className="px-3 mb-[18px]">
-        <img src="logo.svg" alt="NEXUS" style={{height:30}}/>
+        <img src="logo.svg" alt="HOS" style={{height:30}}/>
         <div className="text-[11px] font-medium sub tracking-widest mt-3">PRIMARY CARE · GP</div>
       </div>
       <nav className="space-y-1">

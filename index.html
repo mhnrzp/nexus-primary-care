@@ -3,8 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NEXUS — Front Desk (Live Calls)</title>
+<title>Front Desk · HOS</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<meta name="description" content="HOS Front Desk — AI live-call switchboard for NHS GP reception: triage, urgency tiering, booking approvals and morning review." />
+<meta name="theme-color" content="#0D9488" />
+<meta name="color-scheme" content="light" />
+<link rel="preconnect" href="https://unpkg.com" crossorigin />
+<link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin />
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -533,7 +538,7 @@ function Sidebar({ nav, go, morningCount }){
   return (
     <aside className="w-56 shrink-0 h-screen sticky top-0 px-3 pt-7 pb-5 border-r line bg-white flex flex-col">
       <div className="px-3 mb-[18px]">
-        <img src="logo.svg" alt="NEXUS" style={{height:30}}/>
+        <img src="logo.svg" alt="HOS" style={{height:30}}/>
         <div className="text-[11px] font-medium sub tracking-widest mt-3">FRONT DESK</div>
       </div>
       <nav className="space-y-1">{NAV.map(([k,label,d])=><button key={k} onClick={()=>go(k)} className={`nav w-full flex items-center gap-3 px-3 py-2.5 text-sm ${nav===k?'on':''}`}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{d}</svg><span className="flex-1 text-left">{label}</span>{k==='morning'&&morningCount>0&&<span className="inline-flex items-center justify-center font-bold" style={{width:22,height:22,minWidth:22,borderRadius:'50%',fontSize:12,lineHeight:1,background:nav===k?'#fff':'#0D9488',color:nav===k?'#0D9488':'#fff'}}>{morningCount}</span>}</button>)}</nav>
