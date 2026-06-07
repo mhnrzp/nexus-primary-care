@@ -312,7 +312,7 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
         <div className="text-xs sub mt-1">{c.symptoms}</div>
         <div className="text-xs mt-1" style={{color:'#b91c1c'}}>999 advised · no booking · duty team alerted.</div>
         <div className="flex gap-2 mt-3">
-          <button onClick={()=>onOpen(c.id)} className="listen-btn text-sm px-3 py-1.5 rounded-lg border line">Listen in</button>
+          <button onClick={()=>onOpen(c.id)} className="listen-btn text-sm px-3 py-1.5 rounded-lg border line">Join call</button>
           <button onClick={()=>act(()=>onAck(c))} className="ack-btn text-white text-sm px-3 py-1.5 rounded-lg flex-1" style={{background:'#dc2626'}}>Acknowledge</button>
         </div>
       </div>
@@ -359,7 +359,8 @@ function ApprovalCard({ c, onApprove, onReject, onEdit, onAck, onOpen }){
 }
 
 function ApprovalsPanel({ calls, onApprove, onReject, onEdit, onAck, onOpen }){
-  const queue = calls.filter(c=> c.status==='await-approval' || (c.status==='emergency' && !c.ack));
+  const queue = calls.filter(c=> c.status==='await-approval' || (c.status==='emergency' && !c.ack))
+    .sort((a,b)=> (a.status==='emergency'?0:1) - (b.status==='emergency'?0:1));  // emergencies always first
   return (
     <div className="flex flex-col" style={{height:600}}>
       <div className="flex items-center gap-2 mb-3 shrink-0">
