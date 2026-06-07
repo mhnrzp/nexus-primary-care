@@ -387,7 +387,7 @@ function LiveCalls({ calls, sel, setSel, onApprove, onReject, onEdit, onAck, onC
   const [expanded,setExpanded] = useState(false);
   const isVisible = c=> !(c.status==='booked' || c.ack || (c.status==='ended' && c.urgency!=='Urgent'));
   const active = calls.filter(c=>!['booked','ended'].includes(c.status) && !c.ack);
-  const board = calls;  // each CallCard fades itself out then unmounts when it leaves
+  const board = [...calls].sort((a,b)=> (a.status==='emergency'?0:1) - (b.status==='emergency'?0:1));  // emergencies float to the top; each CallCard fades itself out when it leaves
   const visibleCount = calls.filter(isVisible).length;
   const selCall = calls.find(c=>c.id===sel && isVisible(c)) || null;  // chat clears once the selected call has left
   return (
