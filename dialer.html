@@ -5,29 +5,42 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Call Oakfield Surgery · HOS</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-<meta name="theme-color" content="#0D9488" />
+<meta name="theme-color" content="#000000" />
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   *,::before,::after{ box-sizing:border-box; }
-  body{ margin:0; min-height:100vh; font-family:'Inter','Segoe UI',system-ui,sans-serif; background:radial-gradient(1200px 600px at 50% -10%, #0f766e, #042f2c); color:#e6fffb; -webkit-font-smoothing:antialiased; display:flex; align-items:center; justify-content:center; padding:24px; }
-  .phone{ width:380px; max-width:100%; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:32px; padding:22px; backdrop-filter:blur(8px); box-shadow:0 30px 80px rgba(0,0,0,.45); }
-  .key{ height:64px; border-radius:18px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.08); color:#fff; font-size:24px; font-weight:600; transition:.12s; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; cursor:pointer; }
-  .key:hover{ background:rgba(255,255,255,.16); } .key:active{ transform:scale(.95); }
-  .key small{ font-size:9px; letter-spacing:.15em; color:rgba(255,255,255,.55); margin-top:3px; font-weight:600; }
-  .call{ background:#22c55e; } .call:hover{ background:#16a34a; } .end{ background:#ef4444; } .end:hover{ background:#dc2626; }
-  .rbtn{ height:62px; width:62px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer; transition:.12s; }
-  .rbtn:active{ transform:scale(.93); }
-  .pulse{ animation:pl 1.4s ease-out infinite; } @keyframes pl{ 0%{box-shadow:0 0 0 0 rgba(34,197,94,.5);} 70%{box-shadow:0 0 0 16px rgba(34,197,94,0);} 100%{box-shadow:0 0 0 0 rgba(34,197,94,0);} }
-  .mic{ display:inline-flex; gap:3px; align-items:flex-end; height:16px; }
-  .mic i{ width:3px; background:#5eead4; border-radius:2px; animation:wave 1s ease-in-out infinite; }
+  body{ margin:0; min-height:100vh; background:#000; color:#fff;
+    font-family:-apple-system,'SF Pro Display','Segoe UI',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .frame{ width:330px; max-width:100%; display:flex; flex-direction:column; }
+  /* number display */
+  .display{ text-align:center; font-weight:300; font-size:46px; letter-spacing:2px; min-height:60px; line-height:60px; }
+  .display .ph{ color:#6b6b70; }
+  /* keypad */
+  .pad{ display:grid; grid-template-columns:repeat(3,1fr); gap:24px 28px; justify-items:center; margin:10px 0 20px; }
+  .key{ width:76px; height:76px; border-radius:50%; background:rgba(255,255,255,.13); color:#fff; border:none;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:background .12s; gap:1px; }
+  .key:active{ background:rgba(255,255,255,.32); }
+  .key b{ font-size:33px; font-weight:400; line-height:1; }
+  .key small{ font-size:10px; font-weight:600; letter-spacing:.18em; color:rgba(255,255,255,.62); height:11px; }
+  /* round action buttons */
+  .rbtn{ width:74px; height:74px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer; transition:transform .1s, filter .12s; }
+  .rbtn:active{ transform:scale(.92); }
+  .green{ background:#34c759; } .green:hover{ filter:brightness(1.05); }
+  .red{ background:#ff3b30; }
+  .del{ background:transparent; }
+  .bubble-ai{ background:#262629; } .bubble-pt{ background:#34c759; color:#04210f; }
+  .mic{ display:inline-flex; gap:3px; align-items:flex-end; height:14px; }
+  .mic i{ width:3px; background:#34c759; border-radius:2px; animation:wave 1s ease-in-out infinite; }
   .mic i:nth-child(2){animation-delay:.15s;} .mic i:nth-child(3){animation-delay:.3s;} .mic i:nth-child(4){animation-delay:.45s;}
-  @keyframes wave{ 0%,100%{height:4px;} 50%{height:16px;} }
-  .fade{ animation:f .3s ease-out; } @keyframes f{ from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:none;} }
+  @keyframes wave{ 0%,100%{height:4px;} 50%{height:14px;} }
+  .fade{ animation:f .28s ease-out; } @keyframes f{ from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:none;} }
+  .ring{ animation:rng 1.6s ease-in-out infinite; } @keyframes rng{ 0%,100%{opacity:.5;} 50%{opacity:1;} }
   input{ font-family:inherit; }
-  ::-webkit-scrollbar{ width:6px; } ::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.2); border-radius:3px; }
+  ::-webkit-scrollbar{ width:5px; } ::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.2); border-radius:3px; }
 </style>
 </head>
 <body>
@@ -37,7 +50,6 @@
 const { useState, useRef, useEffect } = React;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-/* keyword urgency classifier (same heuristic as the front desk) */
 function classify(text){
   const s=(text||'').toLowerCase();
   if(/chest pain|can'?t breathe|cannot breathe|short of breath|struggling to breathe|unconscious|collaps|stroke|slurred|bleeding heavily|severe bleed|suicid|overdose/.test(s)) return 'Emergency';
@@ -47,149 +59,103 @@ function classify(text){
 }
 const SLOT = { Urgent:'a same-day appointment today', Soon:'an appointment within 48 hours', Routine:'a routine appointment next week' };
 
+const PhoneIcon = ({s=28,rot=0})=>(
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{transform:`rotate(${rot}deg)`}}>
+    <path d="M5 4h4l2 5-2 1a11 11 0 005 5l1-2 5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/>
+  </svg>
+);
+
 function Dialer(){
   const [digits,setDigits] = useState('');
-  const [status,setStatus] = useState('idle');     // idle | connecting | in-call | ended
+  const [status,setStatus] = useState('idle');
   const [lines,setLines]   = useState([]);
   const [speaking,setSpeaking] = useState(false);
   const [listening,setListening] = useState(false);
   const [typed,setTyped] = useState('');
-  const recRef = useRef(null);
-  const pendingRef = useRef(null);   // handler waiting for the next patient reply (typed fallback)
-  const dataRef = useRef({});
-  const boxRef = useRef(null);
-  useEffect(()=>{ if(boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight; },[lines,listening]);
+  const recRef=useRef(null); const pendingRef=useRef(null); const dataRef=useRef({}); const boxRef=useRef(null);
+  useEffect(()=>{ if(boxRef.current) boxRef.current.scrollTop=boxRef.current.scrollHeight; },[lines,listening]);
 
-  function press(d){ if(status==='idle'||status==='ended'){ if(status==='ended'){setStatus('idle');setLines([]);} setDigits(v=>(v+d).slice(0,15)); } }
+  function press(d){ if(status==='ended'){setStatus('idle');setLines([]);setDigits('');} if(status==='idle'||status==='ended') setDigits(v=>(v+d).slice(0,16)); }
   function del(){ setDigits(v=>v.slice(0,-1)); }
-
   function addLine(who,text){ setLines(l=>[...l,{who,text}]); }
 
   function speak(text, after){
     addLine('ai',text);
-    if(!('speechSynthesis' in window)){ setTimeout(()=>after&&after(), 600); return; }
+    if(!('speechSynthesis' in window)){ setTimeout(()=>after&&after(),600); return; }
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang='en-GB'; u.rate=1; u.pitch=1;
-    u.onstart=()=>setSpeaking(true);
-    u.onend=()=>{ setSpeaking(false); after&&after(); };
+    const u=new SpeechSynthesisUtterance(text); u.lang='en-GB'; u.rate=1; u.pitch=1;
+    u.onstart=()=>setSpeaking(true); u.onend=()=>{ setSpeaking(false); after&&after(); };
     window.speechSynthesis.speak(u);
   }
-
   function listen(handler){
     if(SR){
-      const r = new SR(); recRef.current=r; r.lang='en-GB'; r.interimResults=false; r.maxAlternatives=1;
-      let got=false;
+      const r=new SR(); recRef.current=r; r.lang='en-GB'; r.interimResults=false; r.maxAlternatives=1; let got=false;
       r.onresult=(e)=>{ got=true; const t=e.results[0][0].transcript; setListening(false); addLine('pt',t); handler(t); };
-      r.onerror=()=>{ setListening(false); if(!got){ speak("Sorry, I didn't catch that. Could you say it again?", ()=>listen(handler)); } };
+      r.onerror=()=>{ setListening(false); if(!got) speak("Sorry, I didn't catch that. Could you say it again?", ()=>listen(handler)); };
       r.onend=()=>setListening(false);
-      setListening(true);
-      try{ r.start(); }catch(e){}
-    } else {
-      // no speech recognition -> typed fallback
-      pendingRef.current=handler; setListening(true);
-    }
+      setListening(true); try{ r.start(); }catch(e){}
+    } else { pendingRef.current=handler; setListening(true); }
   }
-  function submitTyped(){
-    const t=typed.trim(); if(!t||!pendingRef.current) return;
-    const h=pendingRef.current; pendingRef.current=null; setListening(false); setTyped(''); addLine('pt',t); h(t);
-  }
+  function submitTyped(){ const t=typed.trim(); if(!t||!pendingRef.current) return; const h=pendingRef.current; pendingRef.current=null; setListening(false); setTyped(''); addLine('pt',t); h(t); }
 
-  /* ---- conversation flow ---- */
-  function startCall(){
-    if(!digits) return;
-    setStatus('connecting'); setLines([]); dataRef.current={};
-    setTimeout(()=>{ setStatus('in-call'); step1(); }, 1400);
-  }
+  function startCall(){ if(!digits) return; setStatus('connecting'); setLines([]); dataRef.current={}; setTimeout(()=>{ setStatus('in-call'); step1(); },1500); }
   function step1(){ speak("Hello, you've reached Oakfield Surgery. I'm the practice's AI assistant. May I take your name?", ()=>listen(onName)); }
-  function onName(t){ dataRef.current.name=t.replace(/[.?!]/g,'').trim(); const first=dataRef.current.name.split(' ')[0]; speak(`Thank you, ${first}. What's the reason for your call today?`, ()=>listen(onReason)); }
-  function onReason(t){
-    dataRef.current.symptoms=t; const u=classify(t); dataRef.current.urgency=u;
+  function onName(t){ dataRef.current.name=t.replace(/[.?!]/g,'').trim(); const f=dataRef.current.name.split(' ')[0]; speak(`Thank you, ${f}. What's the reason for your call today?`, ()=>listen(onReason)); }
+  function onReason(t){ dataRef.current.symptoms=t; const u=classify(t); dataRef.current.urgency=u;
     if(u==='Emergency'){ speak("That sounds like it could be a medical emergency. Please hang up and call 999 right away, or go to A&E. I won't book an appointment for this — get help now. Take care.", endCall); return; }
-    speak(`Thanks for telling me. That doesn't sound like an emergency, but it's worth being seen. I can offer ${SLOT[u]}. Shall I book that for you?`, ()=>listen(onConfirm));
-  }
-  function onConfirm(t){
-    if(/^(y|yes|yeah|yep|ok|okay|sure|please|go ahead|that's fine|fine)/i.test(t.trim())){
-      const first=(dataRef.current.name||'there').split(' ')[0];
-      speak(`Lovely. I've booked that in and you'll get a text to confirm. Is there anything else, ${first}? If not, take care and goodbye.`, endCall);
-    } else {
-      speak("No problem, I won't book that. If you change your mind, just call back. Take care, goodbye.", endCall);
-    }
-  }
-  function endCall(){ setTimeout(()=>setStatus('ended'), 400); }
+    speak(`Thanks for telling me. That doesn't sound like an emergency, but it's worth being seen. I can offer ${SLOT[u]}. Shall I book that for you?`, ()=>listen(onConfirm)); }
+  function onConfirm(t){ if(/^(y|yes|yeah|yep|ok|okay|sure|please|go ahead|that's fine|fine)/i.test(t.trim())){ const f=(dataRef.current.name||'there').split(' ')[0]; speak(`Lovely. I've booked that in and you'll get a text to confirm. Anything else, ${f}? If not, take care and goodbye.`, endCall); } else { speak("No problem, I won't book that. If you change your mind, just call back. Take care, goodbye.", endCall); } }
+  function endCall(){ setTimeout(()=>setStatus('ended'),500); }
+  function hangup(){ try{window.speechSynthesis&&window.speechSynthesis.cancel();}catch(e){} try{recRef.current&&recRef.current.abort();}catch(e){} pendingRef.current=null; setSpeaking(false); setListening(false); setStatus('ended'); }
 
-  function hangup(){
-    try{ window.speechSynthesis && window.speechSynthesis.cancel(); }catch(e){}
-    try{ recRef.current && recRef.current.abort(); }catch(e){}
-    pendingRef.current=null; setSpeaking(false); setListening(false); setStatus('ended');
-  }
-
-  const inCall = status==='in-call'||status==='connecting';
   const KEYS=[['1',''],['2','ABC'],['3','DEF'],['4','GHI'],['5','JKL'],['6','MNO'],['7','PQRS'],['8','TUV'],['9','WXYZ'],['*',''],['0','+'],['#','']];
 
-  return (
-    <div className="phone">
-      <div className="text-center mb-1">
-        <div className="text-xs tracking-widest" style={{color:'rgba(255,255,255,.6)'}}>HOS · VOICE AGENT</div>
-        <div className="text-sm mt-0.5" style={{color:'rgba(255,255,255,.85)'}}>{status==='in-call'?'On call':status==='connecting'?'Connecting…':status==='ended'?'Call ended':'Dial any number'}</div>
+  /* ---------- idle: keypad ---------- */
+  if(status==='idle'||status==='ended'){
+    return (
+      <div className="frame">
+        <div className="display">{digits || <span className="ph">&nbsp;</span>}</div>
+        <div className="pad">
+          {KEYS.map(([n,l])=><button key={n} className="key" onClick={()=>press(n)}><b>{n}</b><small>{l}</small></button>)}
+        </div>
+        <div className="grid grid-cols-3 items-center">
+          <div></div>
+          <div className="flex justify-center"><button className="rbtn green" onClick={startCall} disabled={!digits} style={!digits?{opacity:.4,cursor:'default'}:{}}><PhoneIcon/></button></div>
+          <div className="flex justify-center">{digits && <button className="del" onClick={del} style={{background:'transparent'}}><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2zM15 9l-4 6M11 9l4 6"/></svg></button>}</div>
+        </div>
+        <div className="text-center text-[12px] mt-6" style={{color:'#8e8e93'}}>{SR?'Dial any number · allow the microphone when asked':'Dial any number · type your replies (voice not supported here)'}</div>
       </div>
+    );
+  }
 
-      {!inCall && status!=='ended' && (
-        <>
-          <div className="text-center text-3xl font-semibold tracking-wide my-4 h-10">{digits||<span style={{color:'rgba(255,255,255,.3)'}}>enter number</span>}</div>
-          <div className="grid grid-cols-3 gap-3">
-            {KEYS.map(([n,l])=><button key={n} className="key" onClick={()=>press(n)}>{n}<small>{l}</small></button>)}
+  /* ---------- in call ---------- */
+  return (
+    <div className="frame fade">
+      <div className="text-center mt-2">
+        <div className="text-[26px] font-medium">Oakfield Surgery</div>
+        <div className="text-sm mt-1" style={{color:'#8e8e93'}}>{status==='connecting'?'calling…':digits}</div>
+        <div className="flex items-center justify-center gap-2 h-6 mt-2">
+          {speaking && <span className="text-xs ring" style={{color:'#34c759'}}>● speaking</span>}
+          {listening && SR && <><span className="mic"><i></i><i></i><i></i><i></i></span><span className="text-xs" style={{color:'#34c759'}}>listening</span></>}
+        </div>
+      </div>
+      <div ref={boxRef} className="space-y-2 overflow-y-auto px-1 my-3" style={{height:340}}>
+        {status==='connecting' && <div className="text-center text-sm ring" style={{color:'#8e8e93'}}>Connecting to Oakfield Surgery…</div>}
+        {lines.map((m,i)=>(
+          <div key={i} className={`flex ${m.who==='ai'?'justify-start':'justify-end'} fade`}>
+            <div className={`max-w-[85%] rounded-[20px] px-3.5 py-2 text-sm ${m.who==='ai'?'bubble-ai':'bubble-pt'}`}>{m.text}</div>
           </div>
-          <div className="flex items-center justify-center gap-8 mt-5">
-            <div style={{width:62}}></div>
-            <button className="rbtn call pulse" onClick={startCall} title="Call" disabled={!digits} style={!digits?{opacity:.4}:{}}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h4l2 5-2 1a11 11 0 005 5l1-2 5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/></svg>
-            </button>
-            <button className="rbtn" onClick={del} title="Delete" style={{background:'rgba(255,255,255,.1)'}}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2zM15 9l-4 6M11 9l4 6"/></svg>
-            </button>
-          </div>
-          <div className="text-center text-[11px] mt-4" style={{color:'rgba(255,255,255,.5)'}}>{SR?'Allow microphone when prompted. Best in Chrome.':'Voice input not supported here — you can type your replies.'}</div>
-        </>
-      )}
-
-      {inCall && (
-        <div className="fade">
-          <div className="text-center text-2xl font-semibold tracking-wide mt-3">{digits}</div>
-          <div className="text-center text-xs mb-3" style={{color:'rgba(255,255,255,.6)'}}>Oakfield Surgery</div>
-          <div className="flex items-center justify-center gap-2 h-6 mb-2">
-            {speaking && <span className="text-xs" style={{color:'#5eead4'}}>● AI speaking…</span>}
-            {listening && SR && <span className="mic"><i></i><i></i><i></i><i></i></span>}
-            {listening && SR && <span className="text-xs" style={{color:'#5eead4'}}>listening…</span>}
-          </div>
-          <div ref={boxRef} className="space-y-2 overflow-y-auto px-1" style={{height:300}}>
-            {lines.map((m,i)=>(
-              <div key={i} className={`flex ${m.who==='ai'?'justify-start':'justify-end'} fade`}>
-                <div className="max-w-[85%] rounded-2xl px-3 py-2 text-sm" style={m.who==='ai'?{background:'rgba(255,255,255,.14)'}:{background:'#0d9488'}}>{m.text}</div>
-              </div>
-            ))}
-            {status==='connecting' && <div className="text-center text-sm" style={{color:'rgba(255,255,255,.6)'}}>Connecting to Oakfield Surgery…</div>}
-          </div>
-          {listening && !SR && (
-            <div className="flex gap-2 mt-3">
-              <input value={typed} onChange={e=>setTyped(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submitTyped()} autoFocus placeholder="Type your reply…" className="flex-1 px-3 py-2 rounded-xl text-sm" style={{background:'rgba(255,255,255,.12)',color:'#fff',border:'1px solid rgba(255,255,255,.15)',outline:'none'}}/>
-              <button onClick={submitTyped} className="px-4 rounded-xl text-sm font-medium" style={{background:'#0d9488',color:'#fff'}}>Send</button>
-            </div>
-          )}
-          <div className="flex justify-center mt-4">
-            <button className="rbtn end" onClick={hangup} title="Hang up">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{transform:'rotate(135deg)'}}><path d="M5 4h4l2 5-2 1a11 11 0 005 5l1-2 5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/></svg>
-            </button>
-          </div>
+        ))}
+      </div>
+      {listening && !SR && (
+        <div className="flex gap-2 mb-3">
+          <input value={typed} onChange={e=>setTyped(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submitTyped()} autoFocus placeholder="Type your reply…" className="flex-1 px-3 py-2.5 rounded-full text-sm" style={{background:'#1c1c1e',color:'#fff',border:'none',outline:'none'}}/>
+          <button onClick={submitTyped} className="px-5 rounded-full text-sm font-medium" style={{background:'#34c759',color:'#04210f'}}>Send</button>
         </div>
       )}
-
-      {status==='ended' && (
-        <div className="fade text-center py-6">
-          <div className="text-sm mb-4" style={{color:'rgba(255,255,255,.85)'}}>Call ended</div>
-          <button onClick={()=>{setStatus('idle');setDigits('');setLines([]);}} className="px-5 py-2.5 rounded-xl text-sm font-medium" style={{background:'rgba(255,255,255,.12)',color:'#fff'}}>New call</button>
-        </div>
-      )}
+      <div className="flex justify-center mt-1">
+        <button className="rbtn red" onClick={hangup}><PhoneIcon rot={135}/></button>
+      </div>
     </div>
   );
 }
