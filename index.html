@@ -44,7 +44,10 @@
   .loader-logo{ animation:loaderPulse 1.25s ease-in-out infinite; }
   @keyframes loaderPulse{ 0%,100%{ transform:scale(1); opacity:.82; } 50%{ transform:scale(1.07); opacity:1; } }
   .loader-stack{ display:flex; flex-direction:column; align-items:center; gap:16px; }
-  .loader-tag{ color:rgba(255,255,255,.92); font-size:14px; letter-spacing:.04em; font-weight:500; }
+  .loader-logo{ animation:loaderIn .5s ease-out both, loaderPulse 1.25s ease-in-out .5s infinite; }
+  .loader-tag{ color:rgba(255,255,255,.92); font-size:14px; letter-spacing:.04em; font-weight:500; opacity:0; animation:tagIn .55s ease-out .7s forwards; }
+  @keyframes loaderIn{ from{ opacity:0; transform:scale(.92); } to{ opacity:1; transform:scale(1); } }
+  @keyframes tagIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
   .card{ background:#fff; border:1px solid var(--line); border-radius:16px; }
   .row:hover{ background:var(--soft); }
   .fade{ animation:f .25s ease-out; } @keyframes f{ from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:none;} }
