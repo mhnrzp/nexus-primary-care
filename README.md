@@ -16,7 +16,6 @@ Just open it in a browser.
 |------|------------|
 | **`index.html`** | **Front desk** — a live-call switchboard. The AI voice agent handles multiple patient calls at once; staff listen in on a live transcript, see captured data (name, MRN, DOB, symptoms, urgency), and approve/edit/reject the bookings it proposes in a separate "Needs staff action" queue. Includes urgency tiering (Routine / Soon / Urgent / Emergency), red-flag emergency handling (999, no booking), notifications, call-back for missed urgent calls, and a weekly calendar. |
 | **`gp.html`** | **GP / clinician app** — dashboard (search + today's clinic), full patient record (Summary, Encounters, Medical History, Medications, Allergies, Problems, Orders, Results, Documents), a clinical encounter flow (Chief Complaint → HPI → ROS → Examination → Assessment → Plan → Orders → Results & Follow-up) with an AI scribe and an ordering copilot, plus Appointments calendar, Messages, Reports and Admin. |
-| **`nexus.html`** | **Full platform demo** — role-based views (GP, nurse, receptionist, practice manager), call handling, urgency engine, the unified approval queue, patient/clinical modules, AI admin agents (scheduling, comms, referral, rostering), and an audit log. |
 
 ## Running
 
