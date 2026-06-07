@@ -71,7 +71,8 @@
 <div id="root"></div>
 <script>
   (function(){
-    function hide(){ var l=document.getElementById('loader'); if(l) l.classList.add('hide'); }
+    document.documentElement.style.overflow='hidden';
+    function hide(){ var l=document.getElementById('loader'); if(l) l.classList.add('hide'); document.documentElement.style.overflow=''; }
     var t=setInterval(function(){ var r=document.getElementById('root'); if(r && r.children.length){ clearInterval(t); setTimeout(hide,350); } },80);
     setTimeout(function(){ clearInterval(t); hide(); }, 4000);
   })();
@@ -503,7 +504,7 @@ function ProfileSwitcher({ current }){
     { key:'gp', initials:'DE', name:'Dr Ellis', sub:'GP', href:'gp.html' },
   ];
   const cur = profiles.find(p=>p.key===current);
-  function goPanel(href){ const l=document.getElementById('loader'); if(l) l.classList.remove('hide'); setTimeout(()=>{ window.location.href=href; }, 500); }
+  function goPanel(href){ document.documentElement.style.overflow='hidden'; window.scrollTo(0,0); const l=document.getElementById('loader'); if(l) l.classList.remove('hide'); setTimeout(()=>{ window.location.href=href; }, 500); }
   return (
     <div className="mt-auto px-3 relative">
       {open && (
